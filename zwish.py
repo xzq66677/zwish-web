@@ -39,9 +39,10 @@ except Exception:
 
 
 def http_json(url, payload, timeout=180):
+    """本机 Ollama 请求：显式直连，避免系统代理劫持 loopback。"""
     req = urllib.request.Request(url, data=json.dumps(payload).encode(),
                                  headers={"Content-Type": "application/json"})
-    return json.load(urllib.request.urlopen(req, timeout=timeout))
+    return json.load(zconfig.urlopen_local(req, timeout=timeout))
 
 
 def pick_refiner():

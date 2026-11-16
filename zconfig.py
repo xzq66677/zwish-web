@@ -9,6 +9,7 @@
 import json
 import os
 import sys
+import urllib.request
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
@@ -140,6 +141,44 @@ def load():
 
 
 CFG = load()
+
+
+# ── 本机 loopback 请求：显式不走代理 ─────────────────────────────
+# Windows 开启系统代理且 ProxyOverride 未包含 loopback 时，urllib 会读取
+# WinINET 代理配置，把 127.0.0.1 / localhost / ::1 的回环请求也转发给代理，
+# 导致本机 Ollama / ComfyUI / CDP 返回 404。
+# 这里为"访问本机服务"单独建一个禁用代理的 opener；云端请求（DeepSeek API /
+# 通用云端供应商 / 模型下载）仍走默认 opener，遵循系统代理设置。
+# 不要用 install_opener 全局替换 —— 那会让云端请求也失去代理能力。
+LOCAL_OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+
+
+def urlopen_local(url, data=None, timeout=None):
+    """访问本机 loopback 服务时专用：强制直连，不经任何系统代理。
+
+    用法与 urllib.request.urlopen 一致，仅用于 Ollama / ComfyUI / 本机 CDP。
+    """
+    if timeout is not None:
+        return LOCAL_OPENER.open(url, data=data, timeout=timeout)
+    return LOCAL_OPENER.open(url, data=data)
+
+
+def ensure_loopback_noproxy():
+    """把 loopback 主机补进 no_proxy 环境变量（兼容措施，不覆盖已有值）。
+
+    代码层的 LOCAL_OPENER 已是主修复，这里额外照顾浏览器/子进程等非 urllib
+    组件；例如 zds 启动的 Chrome CDP 子进程也常读取 no_proxy。
+    """
+    loopback = ("localhost", "127.0.0.1", "::1")
+    for var in ("no_proxy", "NO_PROXY"):
+        cur = os.environ.get(var, "")
+        have = {p.strip().lower() for p in cur.split(",") if p.strip()}
+        add = [h for h in loopback if h.lower() not in have]
+        if add:
+            os.environ[var] = (cur + "," if cur else "") + ",".join(add)
+
+
+ensure_loopback_noproxy()
 
 
 def ask_recommend(model):
