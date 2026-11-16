@@ -134,6 +134,8 @@ python zimg.py --img photo.png --segment "cat" "a white kitten in a spacesuit"
 
 1. 确保本机已装 Chrome / Edge（零额外依赖，无需安装任何 Python 库）。
 2. 顶部选「DS · 网页」，首次会弹出浏览器 → 登录 `chat.deepseek.com` 一次。
+   - ⚠️ **注意**：程序弹出的浏览器使用独立的配置目录 `data/ds_profile`，与你日常使用的浏览器**登录态互不相通**——请务必在**程序弹出的那个新窗口**里登录，而不是你平时用的浏览器。登录一次后自动复用，无需重复登录。
+   - 未登录时程序会快速检测并给出明确提示（不再长时间等待）；登录成功后浏览器进程常驻复用，后续对话不会反复弹窗重启。
 3. 登录态保存在 `data/ds_profile/`（已 gitignore），之后自动复用。
 4. 该通道把内置提示词随任务一起发给网页对话，效果与 API 通道等价。若 DeepSeek 网页改版导致读不到输入/回复，在 `config.json` 的 `ds_web_selectors` 里更新选择器即可，无需改代码。
 
