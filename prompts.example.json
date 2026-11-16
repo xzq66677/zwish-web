@@ -1,0 +1,12 @@
+{
+  "_说明": "复制本文件为 prompts.json 即可生效；只填写你想覆盖的段落，留空或删除即恢复默认。更推荐在网页「⚙️ 设置 → 📝 内置提示词」里直接编辑保存。所有值必须是字符串。",
+  "questions": "",
+  "prompt": "",
+  "rewrite": "",
+  "edit_questions": "",
+  "plan": "",
+  "describe": "",
+  "critique": "",
+  "ds_header": "",
+  "ds_user_header": ""
+}
