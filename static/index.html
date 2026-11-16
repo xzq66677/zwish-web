@@ -1,0 +1,1021 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<title>zwish-web · 许愿式生图向导</title>
+<style>
+  :root{
+    --bg:#FAF9F5; --panel:#FFFFFF; --side:#F0EEE6; --line:#E8E4D9; --line2:#DDD8CB;
+    --txt:#1F1E1D; --dim:#8A8577; --acc:#C96442; --acc-soft:#F5EAE3; --ok:#788C5D;
+    --err:#B5573A; --serif:"Georgia","Noto Serif SC","STZhongsong",serif;
+  }
+  *{box-sizing:border-box; margin:0; padding:0}
+  body{background:var(--bg); color:var(--txt); font-family:"Microsoft YaHei UI",system-ui,sans-serif;
+       display:flex; height:100vh; overflow:hidden}
+  .main{flex:1; display:flex; flex-direction:column; align-items:center; border-right:1px solid var(--line); min-width:0}
+  .col{width:100%; max-width:560px; flex:1; display:flex; flex-direction:column; min-height:0}
+  header{display:flex; align-items:center; gap:12px; padding:14px 22px; border-bottom:1px solid var(--line);
+         flex-wrap:wrap; row-gap:10px}
+  header .logo{font-family:var(--serif); font-weight:700; font-size:18px}
+  header .logo em{color:var(--acc); font-style:normal}
+  .chip{background:transparent; border:1px solid var(--line2); border-radius:20px; padding:5px 15px;
+        font-size:13px; cursor:pointer; color:var(--dim); white-space:nowrap}
+  .chip.on{border-color:var(--acc); color:var(--acc); background:var(--acc-soft)}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--ok); box-shadow:0 0 6px #788C5D66}
+  .status{color:var(--dim); font-size:12px; display:flex; align-items:center; gap:7px; white-space:nowrap}
+  header .sp{flex:1}
+  .sidebtn{display:none; cursor:pointer; border:1px solid var(--line2); border-radius:10px;
+           padding:6px 13px; font-size:13px; color:var(--txt); background:#fff; white-space:nowrap}
+  .sidebtn:hover{border-color:var(--acc); color:var(--acc)}
+  .newchat{cursor:pointer; border:1px solid var(--acc); color:var(--acc); border-radius:10px;
+           padding:6px 14px; font-size:13px; font-weight:600; background:var(--acc-soft); white-space:nowrap}
+  .newchat:hover{background:var(--acc); color:#fff}
+  .mtag{font-size:11px; color:var(--acc); background:var(--acc-soft); border-radius:5px;
+        padding:1px 7px; margin-left:7px; font-weight:500; white-space:nowrap}
+  .chat{flex:1; overflow-y:auto; padding:26px 10px; width:100%}
+  .row{display:flex; margin-bottom:20px}
+  .row.me{justify-content:flex-end}
+  .bubble{max-width:100%; border-radius:16px; padding:13px 17px; line-height:1.75; font-size:14px; white-space:pre-wrap}
+  .me .bubble{background:#EFEAE3; border:1px solid var(--line); border-top-right-radius:5px}
+  .wizard .bubble{background:var(--panel); border:1px solid var(--line); border-top-left-radius:5px; width:100%; box-shadow:0 1px 3px #1f1e1d08}
+  .who{font-size:12px; color:var(--dim); margin-bottom:7px; display:flex; align-items:center; gap:7px}
+  .who .z{font-family:var(--serif); color:var(--acc); font-weight:700}
+  .qcard{background:var(--bg); border:1px solid var(--line); border-radius:12px; padding:13px 15px; margin:10px 0}
+  .qcard p{font-size:14px; margin-bottom:10px; font-weight:600}
+  .cinp{width:100%; margin-top:9px; border:1px solid var(--line2); border-radius:9px;
+        padding:8px 12px; font-size:13px; outline:none; background:#fff; color:var(--txt)}
+  .cinp:focus{border-color:var(--acc)}
+  .opts{display:flex; flex-wrap:wrap; gap:8px}
+  .opt{border:1px solid var(--line2); border-radius:9px; padding:8px 15px; font-size:13px; cursor:pointer; color:#5c574c; background:#fff}
+  .opt:hover{border-color:var(--acc)}
+  .opt.sel{border-color:var(--acc); color:var(--acc); background:var(--acc-soft); font-weight:600}
+  .promptcard{background:var(--bg); border:1px solid var(--line); border-left:3px solid var(--acc); border-radius:12px; padding:15px 17px; margin:10px 0}
+  .promptcard .tag{font-size:12px; color:var(--acc); margin-bottom:9px; letter-spacing:1px}
+  .promptcard .txt{font-family:var(--serif); font-size:15px; line-height:1.9; color:#2a2824; outline:none; border-radius:6px}
+  .promptcard .txt[contenteditable=true]{background:#fff; border:1px solid var(--line2); padding:10px}
+  .promptcard .cn-note{font-size:12px; color:var(--dim); line-height:1.7; margin-top:9px; padding-top:9px; border-top:1px dashed var(--line2)}
+  .note{font-size:12px; color:var(--ok); margin-top:8px}
+  .actions{display:flex; gap:10px; margin-top:13px; flex-wrap:wrap}
+  .btn{border-radius:10px; padding:10px 19px; font-size:14px; cursor:pointer; border:1px solid var(--line2); background:#fff; color:var(--txt)}
+  .btn:hover{border-color:var(--acc); color:var(--acc)}
+  .btn.primary{background:var(--acc); border-color:var(--acc); color:#fff; font-weight:600}
+  .btn.primary:hover{background:#B5573A; color:#fff}
+  .progress{background:var(--bg); border:1px solid var(--line); border-radius:12px; padding:14px 16px; margin:10px 0; font-size:13px; color:var(--dim)}
+  .bar{height:6px; background:#E8E4D9; border-radius:4px; overflow:hidden; margin-top:10px}
+  .bar i{display:block; height:100%; width:0%; background:linear-gradient(90deg,var(--acc),#E0A075); border-radius:4px; transition:width .4s}
+  .imgcard{margin:10px 0}
+  .imgcard img{max-width:100%; max-height:460px; border-radius:14px; border:1px solid var(--line); display:block; box-shadow:0 4px 18px #1f1e1d12; cursor:zoom-in}
+  .imgbtns{display:flex; gap:8px; margin-top:10px; flex-wrap:wrap}
+  .mini{font-size:12px; padding:7px 13px; border-radius:8px; border:1px solid var(--line2); color:var(--dim); cursor:pointer; background:#fff}
+  .mini:hover{color:var(--acc); border-color:var(--acc)}
+  .attach{display:flex; align-items:center; gap:8px; background:var(--acc-soft); border:1px solid var(--acc); border-radius:10px; padding:7px 12px; font-size:12px; color:var(--acc); margin-bottom:8px}
+  .attach b{font-weight:600; max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  .attach span{cursor:pointer; color:var(--err); font-weight:700}
+  .err{color:var(--err); font-size:13px}
+  .inputbar{display:flex; gap:8px; padding:9px 12px; border-top:1px solid var(--line); background:var(--bg)}
+  .inputbar input{flex:1; background:#fff; border:1px solid var(--line2); border-radius:11px; padding:8px 14px; color:var(--txt); font-size:14px; outline:none}
+  .inputbar input:focus{border-color:var(--acc)}
+  .inputbar .send{background:var(--acc); border:none; border-radius:11px; padding:0 20px; color:#fff; font-size:14px; cursor:pointer; font-weight:600}
+  .dropzone{position:fixed; inset:0; background:#C96442cc; display:none; align-items:center; justify-content:center;
+            font-size:24px; color:#fff; z-index:50; pointer-events:none}
+  .dropzone.on{display:flex}
+  .side{width:238px; background:var(--side); padding:18px; overflow-y:auto}
+  .side h3{font-size:12px; color:var(--dim); margin-bottom:12px; font-weight:500; letter-spacing:1px}
+  .grid{display:grid; grid-template-columns:1fr 1fr; gap:8px}
+  .gwrap{position:relative}
+  .gwrap img{width:100%; border-radius:10px; border:1px solid var(--line); cursor:pointer; display:block}
+  .gdel{position:absolute; top:4px; right:4px; width:20px; height:20px; border-radius:6px;
+        background:#1f1e1daa; color:#fff; font-size:11px; display:none; align-items:center;
+        justify-content:center; cursor:pointer}
+  .gwrap:hover .gdel{display:flex}
+  .gdel:hover{background:var(--err)}
+  .params .pr{margin-bottom:13px}
+  .params .pr label{font-size:12px; color:#4a463c; display:flex; justify-content:space-between; align-items:baseline}
+  .params .pr label b{color:var(--acc); font-weight:600}
+  .params .pr .ex{font-size:11px; color:var(--dim); line-height:1.6; margin-top:3px}
+  .params .pr input[type=range]{width:100%; accent-color:var(--acc); margin-top:5px}
+  .params .pr input[type=text]{width:100%; border:1px solid var(--line2); border-radius:8px; padding:6px 10px; font-size:12px; outline:none; background:#fff}
+  .params .pr input[type=text]:focus{border-color:var(--acc)}
+  .sizes{display:flex; gap:6px; flex-wrap:wrap}
+  .sizes .opt{padding:6px 11px; font-size:12px}
+  .lock{font-size:11px; color:var(--dim); cursor:pointer; border-bottom:1px dashed var(--line2)}
+  .lock.on{color:var(--acc)}
+  .histpanel{position:fixed; top:0; right:-420px; width:400px; height:100vh; background:var(--bg);
+             border-left:1px solid var(--line); box-shadow:-8px 0 30px #1f1e1d1a; z-index:70;
+             transition:right .25s; display:flex; flex-direction:column}
+  .histpanel.on{right:0}
+  .hhead{display:flex; align-items:center; justify-content:space-between; padding:16px 20px; border-bottom:1px solid var(--line)}
+  .hhead b{font-family:var(--serif); font-size:16px}
+  .hhead .x{cursor:pointer; color:var(--dim); font-size:18px}
+  .hlist{flex:1; overflow-y:auto; padding:16px}
+  .hrec{background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:12px 14px; margin-bottom:12px}
+  .hrec .top{display:flex; gap:10px}
+  .hrec .top img{width:72px; height:72px; object-fit:cover; border-radius:8px; border:1px solid var(--line); flex-shrink:0}
+  .hrec .meta{font-size:11px; color:var(--dim); display:flex; gap:6px; flex-wrap:wrap; margin-bottom:5px; align-items:center}
+  .hrec .mchip{background:var(--acc-soft); color:var(--acc); border-radius:5px; padding:1px 7px}
+  .hrec .mchip.src{background:#EFEAE3; color:var(--dim)}
+  .hrec .pt{font-family:var(--serif); font-size:13px; line-height:1.7; color:#2a2824; cursor:pointer;
+            display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden}
+  .hrec .pt.open{-webkit-line-clamp:unset}
+  .hrec .acts{display:flex; gap:6px; margin-top:9px; flex-wrap:wrap}
+  .hrec .acts span{font-size:11px; padding:5px 10px; border:1px solid var(--line2); border-radius:7px; cursor:pointer; color:var(--dim); background:#fff}
+  .hrec .acts span:hover{color:var(--acc); border-color:var(--acc)}
+  .hempty{color:var(--dim); font-size:13px; text-align:center; margin-top:40px}
+  .setpanel{position:fixed; top:0; right:-460px; width:460px; height:100vh; background:var(--bg);
+            border-left:1px solid var(--line); box-shadow:-8px 0 30px #1f1e1d1a; z-index:80;
+            transition:right .25s; display:flex; flex-direction:column}
+  .setpanel.on{right:0}
+  .settabs{display:flex; gap:0; padding:0 20px; border-bottom:1px solid var(--line)}
+  .settabs .tab{padding:11px 14px; font-size:13px; color:var(--dim); cursor:pointer; border-bottom:2px solid transparent}
+  .settabs .tab:hover{color:var(--acc)}
+  .settabs .tab.on{color:var(--acc); border-bottom-color:var(--acc); font-weight:600}
+  .sbody{flex:1; overflow-y:auto; padding:16px}
+  .pbody{flex:1; overflow-y:auto; padding:16px}
+  .pitem{background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:13px 14px; margin-bottom:13px}
+  .pitem.custom{border-left:3px solid var(--acc)}
+  .pitem .ph{display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:4px}
+  .pitem .ph b{font-family:var(--serif); font-size:14px}
+  .pitem .ph .badge{font-size:10px; color:var(--acc); background:var(--acc-soft); border-radius:5px; padding:1px 7px}
+  .pitem .pdesc{font-size:11px; color:var(--dim); line-height:1.6; margin-bottom:8px}
+  .pitem textarea{width:100%; min-height:96px; resize:vertical; border:1px solid var(--line2); border-radius:8px;
+    padding:9px 11px; font-size:12px; line-height:1.65; color:var(--txt); background:#fff; outline:none; font-family:inherit}
+  .pitem textarea:focus{border-color:var(--acc)}
+  .pitem .pops{display:flex; justify-content:flex-end; gap:8px; margin-top:7px}
+  .pitem .pops .mini{font-size:11px; padding:5px 10px}
+  .prov{background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:14px; margin-bottom:14px}
+  .prov.off{opacity:.55}
+  .prow{display:flex; gap:8px; align-items:center; margin-bottom:9px}
+  .prow label{font-size:12px; color:var(--dim); width:96px; flex-shrink:0}
+  .prow input, .prow select{flex:1; border:1px solid var(--line2); border-radius:8px; padding:7px 10px;
+    font-size:13px; outline:none; background:#fff; color:var(--txt); min-width:0}
+  .prow input:focus, .prow select:focus{border-color:var(--acc)}
+  .prow .sw{display:flex; align-items:center; gap:5px; font-size:12px; cursor:pointer; flex-shrink:0}
+  .tres{font-size:12px; flex:1}
+  .tres.ok{color:var(--ok)} .tres.bad{color:var(--err)}
+  #cloudSel{border:1px solid var(--line2); border-radius:10px; padding:6px 10px; font-size:13px;
+            background:#fff; color:var(--txt)}
+
+  /* ── 窄窗口适配 ── */
+  @media (max-width:1180px){
+    .status{display:none}
+  }
+  @media (max-width:680px){
+    .side{display:none}
+    .sidebtn{display:inline-flex}
+    .chat{padding:18px 3%}
+    .inputbar{padding:12px 10px}
+  }
+  .side .ops{display:flex; flex-direction:column; gap:8px; margin-top:8px}
+  .side .mini{width:100%}
+  .lightbox{position:fixed; inset:0; background:#1f1e1dd9; display:none; align-items:center; justify-content:center; z-index:60; flex-direction:column; gap:16px}
+  .lightbox.on{display:flex}
+  .lightbox img{max-width:86vw; max-height:80vh; border-radius:14px}
+  .lightbox .btn{background:#fff}
+</style>
+</head>
+<body>
+  <div class="main">
+    <header>
+      <span class="logo">zwish<em>·</em>web</span>
+      <span class="newchat" onclick="newSession()" title="清空对话，重新开始">🔄 新会话</span>
+      <span class="chip on" id="chipUnc" onclick="setModel('auto')" title="本地模型，忠实执行你的想法">自由模式</span>
+      <span class="chip" id="chipCen" onclick="setModel('fine')" title="本地模型，润色更细腻、更有导演感">精细润色</span>
+      <span class="chip" id="chipDsApi" onclick="setModel('ds_api')" title="内置提示词，走 DeepSeek 官方 API">DS · API</span>
+      <span class="chip" id="chipDsWeb" onclick="setModel('ds_web')" title="内置提示词，浏览器自动化 deepseek.com">DS · 网页</span>
+      <span class="chip" id="chipCloud" onclick="setModel('cloud')" style="display:none">☁️ 云端</span>
+      <span class="chip" onclick="openHistory()">📜 历史记录</span>
+      <span class="chip" onclick="openSettings()">⚙️ 设置</span>
+      <span class="sidebtn" onclick="toggleSide()">🗂 画廊 / 参数</span>
+      <select id="cloudSel" style="display:none" onchange="S.cloudSel=this.value"></select>
+      <span class="sp"></span>
+      <span class="status"><span class="dot"></span>ComfyUI · 全程本地</span>
+    </header>
+
+    <div class="col">
+      <div class="chat" id="chat"></div>
+
+      <div class="inputbar">
+        <input id="inp" placeholder="许个愿（想画什么）…" autocomplete="off">
+        <button class="send" onclick="send()">发送</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="side" id="side">
+    <h3>历史图片</h3>
+    <div class="grid" id="gallery"></div>
+    <h3 style="margin-top:20px">⚙️ 生成参数</h3>
+    <div class="params">
+      <div class="pr"><label>尺寸</label>
+        <div class="sizes">
+          <span class="opt" id="sz2" onclick="setSize(1024,1024)">方图</span>
+          <span class="opt" id="sz1" onclick="setSize(1024,768)">横图</span>
+          <span class="opt" id="sz3" onclick="setSize(768,1024)">竖图</span>
+        </div></div>
+      <div class="pr"><label>批量张数</label>
+        <div class="sizes">
+          <span class="opt sel" id="bt1" onclick="setBatch(1)">1 张</span>
+          <span class="opt" id="bt2" onclick="setBatch(2)">2 张</span>
+          <span class="opt" id="bt4" onclick="setBatch(4)">4 张</span>
+        </div>
+        <div class="ex">每张不同种子，串行生成；4 张约 1-2 分钟。「🎲 换种子重试」不受影响</div></div>
+      <div class="pr"><label>追问问题数 <b id="vAsk">跟随模型</b></label>
+        <div class="sizes" style="margin-bottom:7px">
+          <span class="opt sel" id="askModeFollow" onclick="setAskMode('follow')">🎯 跟随模型</span>
+          <span class="opt" id="askModeOnce" onclick="setAskMode('once')">⚡ 一次问清</span>
+        </div>
+        <div class="sizes" id="askBtns"></div>
+        <div class="ex" id="askEx">本地模型上下文有限，推荐少问（2 个）；云端/DS 上下文大，可多问（4 个）。</div></div>
+      <div class="pr"><label>重绘强度 denoise <b id="vDen">自动</b> <span class="lock" id="denLock" onclick="toggleDenLock()">🔒锁定</span></label>
+        <input type="range" id="pDen" min="10" max="100" value="55" oninput="onDen(this.value)">
+        <div class="ex">只影响"改图"：<b>1.0</b>=选中区域完全重画；<b>0.6</b>=新旧各半；越小越保守。默认跟随向导判断</div></div>
+      <div class="pr"><label>生成步数 steps <b id="vStp">8</b></label>
+        <input type="range" id="pStp" min="4" max="16" value="8" oninput="$('vStp').textContent=this.value">
+        <div class="ex">越大越精细越慢。这套 Turbo 模型 8 步已接近最优，一般不用动</div></div>
+      <div class="pr"><label>种子 seed</label>
+        <input type="text" id="pSeed" placeholder="留空 = 每次随机">
+        <div class="ex">同提示词+同种子=同一张图。想"只改提示词、画面基线不变"就固定它</div></div>
+      <div class="pr"><label>蒙版扩边 grow <b id="vGrow">12px</b></label>
+        <input type="range" id="pGrow" min="0" max="40" value="12" oninput="$('vGrow').textContent=this.value+'px'">
+        <div class="ex">蒙版向外多圈多大范围：太小易留旧边，太大误伤周围。12 是稳妥值</div></div>
+      <div class="pr"><label>检测阈值 threshold <b id="vThr">0.5</b></label>
+        <input type="range" id="pThr" min="20" max="70" value="50" oninput="$('vThr').textContent=this.value/100">
+        <div class="ex">SAM3 找目标的严格度：蒙版找不到目标→调低；乱框到别的东西→调高</div></div>
+    </div>
+    <h3 style="margin-top:20px">操作</h3>
+    <div class="ops">
+      <span class="mini" onclick="openFolder()">📂 打开输出文件夹</span>
+      <span class="mini" onclick="document.getElementById('file').click()">🖼 上传图片改图</span>
+      <span class="mini" onclick="window.open('http://127.0.0.1:'+(S.comfyPort||8188),'_blank')">⚙️ 高级：ComfyUI 调参</span>
+    </div>
+    <input type="file" id="file" accept="image/*" style="display:none" onchange="uploadFile(this.files[0])">
+  </div>
+
+  <div class="dropzone" id="dz">松开即上传 → 改图模式</div>
+
+  <div class="histpanel" id="histp">
+    <div class="hhead"><b>📜 生成历史</b>
+      <span class="mini" style="width:auto" onclick="clearHist()">🧹 清空记录</span>
+      <span class="x" onclick="closeHistory()">✕</span></div>
+    <div class="hlist" id="hlist"><div class="hempty">加载中…</div></div>
+  </div>
+
+  <div class="setpanel" id="setp">
+    <div class="hhead"><b>⚙️ 设置</b><span class="x" onclick="closeSettings()">✕</span></div>
+    <div class="settabs">
+      <span class="tab on" id="tabProv" onclick="setSetTab('prov')">☁️ 云端供应商</span>
+      <span class="tab" id="tabPrompt" onclick="setSetTab('prompt')">📝 内置提示词</span>
+    </div>
+    <div id="viewProv" style="display:flex; flex-direction:column; flex:1; min-height:0">
+      <div style="padding:12px 20px 0; font-size:12px; color:var(--dim); line-height:1.7">
+        添加任意 OpenAI 兼容或 Anthropic 接口（DeepSeek / GLM / 中转站…）。
+        选中「DS · API」走 DeepSeek 官方 API（内置提示词）；「DS · 网页」走浏览器自动化（内置提示词）。
+        <b>看图与点评始终用本地视觉模型，图片不出本机</b>。
+      </div>
+      <div class="sbody" id="sbody"></div>
+      <div style="padding:14px 20px; border-top:1px solid var(--line); display:flex; gap:10px; flex-wrap:wrap">
+        <button class="btn" onclick="presetDeepSeek()">⚡ 一键预置 DeepSeek</button>
+        <button class="btn" onclick="addProv()">➕ 新供应商</button>
+        <button class="btn primary" style="flex:1" onclick="saveSettings()">💾 保存</button>
+      </div>
+    </div>
+    <div id="viewPrompt" style="display:none; flex-direction:column; flex:1; min-height:0">
+      <div style="padding:12px 20px 0; font-size:12px; color:var(--dim); line-height:1.7">
+        这里的模板会作为「内置提示词」注入到 <b>DS · 网页 / DS · API / ☁️ 云端</b> 通道。
+        留空即恢复默认；改完点「保存」，立即对所有通道生效。
+      </div>
+      <div class="pbody" id="pbody"><div class="hempty">加载中…</div></div>
+      <div style="padding:14px 20px; border-top:1px solid var(--line); display:flex; gap:10px; flex-wrap:wrap">
+        <button class="btn" onclick="resetAllPrompts()">♻️ 全部恢复默认</button>
+        <button class="btn primary" style="flex:1" onclick="savePrompts()">💾 保存提示词</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="lightbox" id="lb" onclick="this.classList.remove('on')">
+    <img id="lbimg">
+    <button class="btn" onclick="useAsInput()">🔁 用这张继续改</button>
+  </div>
+
+<script>
+const S = { model:"auto", stage:"wish", wish:"", qa:"", answers:[], questions:[], sel:[],
+            prompt:null, promptCn:null, w:1024, h:1024, lastImg:null, attach:null, hist:[], seed:null,
+            params:{ w:1024, h:1024, den:0.55, denLock:false, steps:8, grow:12, threshold:0.5, seed:null, batch:1 },
+            provs:[], cloudSel:null, dsWebOk:false, dsWebMsg:"", visionModel:"gemma4-cc", comfyPort:8188,
+            askCfg:null, askCount:2, askMode:"follow" };
+const $ = id => document.getElementById(id);
+const chat = $("chat"), inp = $("inp");
+function zwishVision(){ return S.visionModel || "gemma4-cc"; }
+
+function modelParam(){
+  if (S.model === "fine") return "__local_fine__";
+  if (S.model === "ds_api") return "__ds_api__";
+  if (S.model === "ds_web") return "__ds_web__";
+  if (S.model === "cloud") return "__cloud__:" + (S.cloudSel || "");
+  return null;   // auto → 本地自由模式
+}
+function setModel(m){
+  if (m === "ds_web" && !S.dsWebOk){
+    addErr("DS 网页通道未就绪：" + ((S.dsWebMsg) || "未检测到本机 Chrome / Edge，安装浏览器后刷新页面即可（本通道零额外依赖，无需 playwright）"));
+    return;
+  }
+  S.model = m;
+  [["chipUnc","auto"],["chipCen","fine"],["chipDsApi","ds_api"],
+   ["chipDsWeb","ds_web"],["chipCloud","cloud"]].forEach(([id,v]) =>
+    $(id).classList.toggle("on", m===v));
+  $("cloudSel").style.display = m==="cloud" ? "" : "none";
+  if (m === "cloud") refreshCloudSel();
+  if (S.askCfg) renderAskBtns();   // 切换通道时刷新推荐问题数
+}
+function scrollEnd(){ chat.scrollTop = chat.scrollHeight; }
+function esc(s){ return (s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+function addMe(t){ chat.insertAdjacentHTML("beforeend", `<div class="row me"><div class="bubble">${esc(t)}</div></div>`); scrollEnd(); }
+function addWizard(html, tag){
+  const div = document.createElement("div");
+  div.className = "row wizard";
+  div.innerHTML = `<div><div class="who"><span class="z">Z</span> zwish 向导${tag?`<span class="mtag">${esc(tag)}</span>`:""}</div><div class="bubble">${html}</div></div>`;
+  chat.appendChild(div); scrollEnd(); return div;
+}
+function addErr(t){ addWizard(`<span class="err">⚠ ${esc(t)}</span>`); }
+async function api(path, body){
+  const r = await fetch(path, body ? {method:"POST", headers:{"Content-Type":"application/json"},
+                                     body: JSON.stringify(body)} : undefined);
+  const j = await r.json();
+  if (j.error) throw new Error(j.error);
+  return j;
+}
+
+function setStage(st, placeholder){
+  S.stage = st;
+  inp.placeholder = placeholder || inp.placeholder;
+}
+setStage("wish", "许个愿（想画什么）…");
+
+/* ── 愿望 → 追问 ── */
+async function askQuestions(wish){
+  S.wish = wish; S.answers = []; S.sel = [];
+  const div = addWizard("✨ 正在理解你的愿望…");
+  div.querySelector(".bubble").id = "qsb";
+  try{
+    const r = await api("/api/questions", {wish, model: modelParam(), count: askEffective()});
+    S.questions = r.questions; S.refiner = r.refiner;
+    div.querySelector(".who").insertAdjacentHTML("beforeend",
+      `<span class="mtag">✨ 追问 · ${esc(r.refiner)}</span>`);
+    div.querySelector(".bubble").innerHTML =
+      `好的，先确认 ${S.questions.length} 个对画面影响最大的问题：` +
+      S.questions.map((q,i)=>`
+        <div class="qcard" data-i="${i}"><p>${"①②③④⑤"[i]} ${esc(q.q)}</p>
+        <div class="opts">${q.options.map(o=>`<span class="opt" data-o="${esc(o)}">${esc(o)}</span>`).join("")}</div>
+        <input class="cinp" placeholder="✏️ 都不合适？输入自定义答案…"></div>`).join("") +
+        `<div class="actions"><button class="btn primary" onclick="composePrompt()">✅ 就这些，合成提示词</button>
+         <button class="btn" onclick="composePrompt()">⏭ 跳过追问，按你的判断来</button></div>`;
+    div.querySelector(".bubble").id = "qsb";
+    $("qsb").querySelectorAll(".qcard").forEach(card => {
+      const i = +card.dataset.i;
+      card.querySelectorAll(".opt").forEach(o => o.onclick = () => {
+        card.querySelectorAll(".opt").forEach(x=>x.classList.remove("sel"));
+        o.classList.add("sel"); S.sel[i] = o.dataset.o;
+        const cinp = card.querySelector(".cinp"); if (cinp) cinp.value = "";
+      });
+      const cinp = card.querySelector(".cinp");
+      if (cinp) cinp.oninput = () => {
+        card.querySelectorAll(".opt").forEach(x=>x.classList.remove("sel"));
+        S.sel[i] = cinp.value.trim();
+      };
+    });
+    setStage("questions", "也可以在问题卡里手输自定义答案…");
+  }catch(e){ addErr("追问生成失败：" + e.message); setStage("wish"); }
+}
+async function composePrompt(){
+  const answers = S.questions.map((q,i)=> S.sel[i] ? `${q.q} → ${S.sel[i]}` : null).filter(Boolean);
+  S.qa = `愿望：${S.wish}\n回答：\n${answers.map(a=>"- "+a).join("\n") || "（无，按向导判断补全）"}`;
+  const div = addWizard("✨ 正在合成精修提示词…");
+  try{
+    const r = await api("/api/prompt", {wish:S.wish, answers: answers.join("; "), model: modelParam()});
+    S.prompt = r.prompt_en || r.prompt; S.promptCn = r.prompt_cn || r.prompt;
+    S.w = r.w; S.h = r.h; S.refiner = r.refiner;
+    div.remove();
+    renderPromptCard("已根据你的愿望与回答合成（英文生图词 · 中文说明）");
+    setStage("confirm", "💬 交流修改：说出建议，向导会重写完整提示词…");
+  }catch(e){ addErr("提示词合成失败：" + e.message); }
+}
+
+/* ── 提示词卡片 ── */
+function renderPromptCard(note, refiner){
+  if (refiner) S.refiner = refiner;
+  const html = note ? `<span class="note">✓ ${esc(note)}</span>` : "";
+  const en = S.prompt || "";
+  const cn = S.promptCn || "";
+  const div = addWizard(`
+    ${html}
+    <div class="promptcard">
+      <div class="tag">生图提示词（英文）${S.refiner?` · ${esc(S.refiner)}`:""} · ${S.w}×${S.h}</div>
+      <div class="txt" id="ptxt">${esc(en)}</div>
+      ${cn ? `<div class="cn-note">💬 ${esc(cn)}</div>` : ""}
+    </div>
+    <div class="actions">
+      <button class="btn primary" onclick="generate()">🚀 开始生成</button>
+      <button class="btn" onclick="setStage('confirm','💬 交流修改：说出建议，向导会重写完整提示词…');inp.focus()">💬 交流修改</button>
+      <button class="btn" onclick="editPrompt()">✍️ 手动改英文词</button>
+    </div>`);
+  setStage("confirm", "💬 交流修改：说出建议，向导会重写完整提示词…");
+  S.promptCard = div;
+}
+function editPrompt(){
+  const t = $("ptxt");
+  t.contentEditable = true; t.focus();
+  t.onblur = () => { t.contentEditable = false;
+    if (t.textContent.trim() && t.textContent.trim() !== S.prompt){
+      S.prompt = t.textContent.trim(); renderPromptCard("已手动更新英文生图词");
+    }};
+}
+
+/* ── 生成（支持批量） ── */
+async function generate(body){
+  body = body || {};
+  if (!body.prompt && S.prompt) body.prompt = S.prompt;   // 🚀直点：自动带上当前提示词
+  if (!body.prompt){ addErr("没有可生成的提示词，请先合成或手动填写");
+    if (S.stage === "gen") setStage("refine"); return; }
+  // 中英双字段：body.prompt 是英文生图词；没有则回退中文（老来源/历史）
+  body.prompt_en = body.prompt_en || body.prompt;
+  body.prompt_cn = body.prompt_cn || S.promptCn || body.prompt;
+  if (S.stage === "gen"){ addErr("已有生成任务进行中，请等它完成"); return; }
+  const P = S.params;
+  const batch = Math.max(1, Math.min(6, P.batch || 1));
+  body.w = body.w || P.w; body.h = body.h || P.h;  // 改图用于显示尺寸标签，实际尺寸来自输入图
+  if (body.img){
+    body.steps = P.steps;
+    body.grow = P.grow;
+    if (body.segment) body.threshold = P.threshold;
+    if (P.denLock) body.denoise = P.den;   // 面板锁定 → 面板值优先
+  } else {
+    body.w = body.w || P.w; body.h = body.h || P.h;
+    body.steps = P.steps;
+    if (P.denLock) delete body.denoise;    // 文生图不适用重绘强度
+  }
+  const baseSeed = body.seed || P.seed || Math.floor(Math.random()*2**31);
+  const est = Math.round(body.w*body.h/1024/1024*16+12);
+  const div = addWizard(`<div class="progress"><span id="ptext"></span>
+      <div class="bar"><i id="pbar"></i></div></div><div class="imgs"></div>`);
+  S.stage = "gen"; inp.placeholder = batch>1 ? "批量生成 0/"+batch+"…" : "生成中…";
+  const results = [];
+  try{
+    for (let k = 0; k < batch; k++){
+      const b2 = Object.assign({}, body, {seed: batch>1 ? baseSeed + k : baseSeed});
+      const ptext = div.querySelector("#ptext");
+      ptext.textContent = `${batch>1?`第 ${k+1}/${batch} 张 · `:""}${b2.w}×${b2.h} · ${b2.img?"改图":"文生图"} ${b2.segment?("· 蒙版:"+b2.segment):""} · ${b2.steps}步`;
+      const bar = div.querySelector("#pbar"); if (bar) bar.style.width = "0%";
+      const r = await api("/api/generate", b2);
+      const t0 = Date.now();
+      let done = null;
+      while(true){
+        await new Promise(res=>setTimeout(res,1000));
+        const j = await api("/api/job/" + r.job);
+        const el = (Date.now()-t0)/1000;
+        if (j.status === "done"){
+          if (bar) bar.style.width = "100%";
+          div.querySelector(".imgs").insertAdjacentHTML("beforeend",
+            `<div class="imgcard"><img src="/assets/${j.image}" onclick="showLb('/assets/${j.image}')">
+             <div class="imgbtns">
+               <span class="mini" onclick="critique('/assets/${j.image}')">🔍 点评</span>
+               <span class="mini" onclick="delImage('${j.image}')">🗑 删除</span>
+             </div></div>`);
+          done = j; break;
+        }
+        if (j.status === "failed"){
+          div.querySelector(".imgs").insertAdjacentHTML("beforeend",
+            `<div class="err">⚠ 第 ${k+1} 张失败</div><div class="err" style="white-space:pre-wrap">${esc((j.error||"").slice(-300))}</div>`);
+          break;
+        }
+        if (bar) bar.style.width = Math.min(92, el/est*100) + "%";
+      }
+      if (done) results.push({image: done.image, body: b2, elapsed: done.elapsed});
+    }
+    const ptext = div.querySelector("#ptext");
+    if (ptext) ptext.textContent = batch>1 ? `批量完成 · 成功 ${results.length}/${batch} 张` : "生成完成";
+    if (results.length){
+      S.lastImg = "/assets/" + results[results.length-1].image;
+      S.prompt = body.prompt_en || body.prompt;
+      S.promptCn = body.prompt_cn || S.promptCn;
+      const acts = document.createElement("div");
+      acts.className = "actions";
+      acts.innerHTML = `<button class="btn" onclick="openFolder()">📂 打开文件夹</button>
+        <button class="btn" onclick="critique()">🔍 看图点评</button>
+        <button class="btn" onclick="setStage('refine','描述想改的地方，向导自动判断整图改/蒙版局部改…');inp.focus()">🔁 用这张继续改</button>`;
+      div.querySelector(".imgs").appendChild(acts);
+      refreshGallery();
+    }
+  }catch(e){ addErr("生成请求失败：" + e.message); }
+  if (S.stage === "gen") setStage("refine", batch>1 ? "批量完成，可继续微调或重新许愿…" : "描述想改的地方，或重新许愿…");
+}
+function reroll(){ generate({prompt:S.prompt, prompt_en:S.prompt, prompt_cn:S.promptCn, w:S.w, h:S.h, seed: Math.floor(Math.random()*2**31)}); }
+function setBatch(n){
+  S.params.batch = n;
+  [["bt1",1],["bt2",2],["bt4",4]].forEach(([id,v]) => $(id).classList.toggle("sel", v===n));
+}
+
+/* ── 追问问题数：跟随模型 / 一次问清 / 手动自选 ──
+   三种模式互斥：
+   - follow 跟随模型：本地 2 / 云端 4，为多轮微调留上下文（默认）
+   - once   一次问清：直接用上限，反正只问这一轮、出图即定稿，用足上下文问透
+   - manual 手动：点数字自选
+*/
+function askIsCloud(){
+  return ["ds_api","ds_web","cloud"].includes(S.model);
+}
+function askRecommended(){
+  const c = S.askCfg || {};
+  return askIsCloud() ? (c.cloud_recommend||4) : (c.local_recommend||2);
+}
+function askLimits(){
+  const c = S.askCfg || {};
+  return {min: c.min||1, max: c.max||8};
+}
+function askEffective(){
+  if (S.askMode === "once") return askLimits().max;   // 一次问清：用足上下文
+  if (S.askMode === "manual") return S.askCount;
+  return askRecommended();                            // follow
+}
+function renderAskBtns(){
+  const {min,max} = askLimits();
+  const cur = askEffective();
+  let html = "";
+  for (let i=min; i<=max; i++){
+    html += `<span class="opt ${S.askMode==="manual" && i===cur?"sel":""}" onclick="setAskCount(${i})">${i}</span>`;
+  }
+  $("askBtns").innerHTML = html;
+  $("askModeFollow").classList.toggle("sel", S.askMode==="follow");
+  $("askModeOnce").classList.toggle("sel", S.askMode==="once");
+  const label = {follow:"跟随模型", once:"一次问清", manual:"手动"}[S.askMode];
+  $("vAsk").textContent = `${label} · ${cur} 个`;
+  if (S.askMode === "once"){
+    $("askEx").innerHTML = `⚡ <b>一次问清</b>：仅此一轮追问、出图即定稿，上下文用完即释放，故直接用上限 <b>${cur}</b> 个把细节问透。适合不想反复精修的场景；若还要多轮微调，请切回「🎯 跟随模型」。`;
+  } else if (S.askMode === "manual"){
+    $("askEx").innerHTML = `已手动选择 <b>${cur}</b> 个。点上方模式可切回自动推荐；本地模型若多轮微调，建议别问太多以免挤占上下文。`;
+  } else {
+    $("askEx").innerHTML = askIsCloud()
+      ? `当前云端/DS，上下文较大，推荐 <b>${askRecommended()}</b> 个。`
+      : `本地模型上下文有限，推荐少问（<b>${askRecommended()}</b> 个）为后续微调留空间。想一次问到位的，点「⚡ 一次问清」。`;
+  }
+}
+function setAskMode(m){
+  S.askMode = m;
+  if (m === "manual") return;    // manual 只能通过点数字进入
+  renderAskBtns();
+}
+function setAskCount(n){
+  S.askCount = n; S.askMode = "manual"; renderAskBtns();
+}
+
+/* ── 微调路由 ── */
+async function doPlan(feedback){
+  const div = addWizard("👀 向导正在看图，准备追问…");
+  try{
+    const img = S.attach || S.lastImg || null;
+    const r = await api("/api/plan_questions", {wish:S.wish, current:S.promptCn || S.prompt,
+      current_en:S.prompt, history: JSON.stringify(S.hist), feedback, img, model: modelParam(), count: askEffective()});
+    const qs = r.questions || [];
+    S.pendingFeedback = feedback; S.editQ = qs; S.selQ = [];
+    if (!qs.length){ div.remove(); return execPlan(false); }
+    div.querySelector(".bubble").innerHTML =
+      `👀 向导看过图了，对这次修改有 ${qs.length} 个问题：` +
+      qs.map((q,i)=>`<div class="qcard" data-i="${i}"><p>${"①②③"[i]||"·"} ${esc(q.q)}</p><div class="opts">${q.options.map(o=>`<span class="opt" data-o="${esc(o)}">${esc(o)}</span>`).join("")}</div><input class="cinp" placeholder="✏️ 都不合适？输入自定义答案…"></div>`).join("") +
+      `<div class="actions"><button class="btn primary" onclick="execPlan(false)">✅ 按回答执行</button>
+       <button class="btn" onclick="execPlan(true)">⏭ 跳过追问，直接执行</button></div>`;
+    div.querySelector(".who").insertAdjacentHTML("beforeend",
+      `<span class="mtag">💬 追问 · ${esc(r.refiner)}</span>`);
+    div.querySelector(".bubble").id = "eqb";
+    $("eqb").querySelectorAll(".qcard").forEach(card => {
+      const i = +card.dataset.i;
+      card.querySelectorAll(".opt").forEach(o => o.onclick = () => {
+        card.querySelectorAll(".opt").forEach(x=>x.classList.remove("sel"));
+        o.classList.add("sel"); S.selQ[i] = o.dataset.o;
+        const cinp = card.querySelector(".cinp"); if (cinp) cinp.value = "";
+      });
+      const cinp = card.querySelector(".cinp");
+      if (cinp) cinp.oninput = () => {
+        card.querySelectorAll(".opt").forEach(x=>x.classList.remove("sel"));
+        S.selQ[i] = cinp.value.trim();
+      };
+    });
+    setStage("refineQ", "手输自定义答案，或点上方按钮…");
+  }catch(e){ addErr("追问生成失败，直接按反馈执行：" + e.message); execPlan(false); }
+}
+async function execPlan(skip){
+  const fb = S.pendingFeedback || "";
+  let fbFull = fb;
+  if (!skip && S.editQ && S.editQ.length){
+    const ans = S.editQ.map((q,i)=> S.selQ[i] ? `${q.q} → ${S.selQ[i]}` : null).filter(Boolean);
+    if (ans.length) fbFull = fb + "\n追问回答：\n" + ans.map(a=>"- "+a).join("\n");
+  }
+  const div = addWizard("📋 规划中…");
+  try{
+    const r = await api("/api/plan", {wish:S.wish, current:S.promptCn || S.prompt, current_en:S.prompt,
+      history: JSON.stringify(S.hist), feedback: fbFull, img: S.attach || S.lastImg || null, model: modelParam()});
+    const p = r.plan || r;
+    if (p.action === "done"){ div.querySelector(".bubble").innerHTML = "好嘞，就到这儿～ 满意的话随时来许下一个愿 ✨"; setStage("wish","重新许愿…"); return; }
+    div.querySelector(".who").insertAdjacentHTML("beforeend",
+      `<span class="mtag">👁 看图 · ${esc(r.vision_model||"gemma")}</span><span class="mtag">📋 规划 · ${esc(r.refiner)}</span>`);
+    div.querySelector(".bubble").innerHTML =
+      (p.image_desc ? `👀 看图：<b>${esc(p.image_desc)}</b><br>` : "") +
+      `📋 计划：<b>${p.action}</b> · ${esc(p.note||"")}`;
+    const gimg = S.attach || (p.action !== "regenerate" ? S.lastImg : null);
+    const pEn = p.prompt_en || p.prompt;           // 生图用英文
+    const pCn = p.prompt_cn || p.note || pEn;      // 展示用中文
+    if (p.action === "regenerate"){
+      generate({prompt:pEn, prompt_en:pEn, prompt_cn:pCn, w:S.w, h:S.h, seed: Math.floor(Math.random()*2**31)});
+    } else {
+      generate({prompt:pEn, prompt_en:pEn, prompt_cn:pCn, img:gimg,
+                segment: p.action==="inpaint" ? p.segment : null,
+                denoise: p.denoise, seed: Math.floor(Math.random()*2**31)});
+    }
+    S.hist.push({feedback: fbFull, action:p.action});
+    S.attach = null;
+  }catch(e){ addErr("微调计划失败：" + e.message); }
+  if (S.stage === "refineQ") setStage("refine", "描述想改的地方…");
+}
+
+/* ── 交流修改（生成前） ── */
+async function doRewrite(feedback){
+  const div = addWizard("✨ 正在根据建议重写提示词…");
+  try{
+    const r = await api("/api/rewrite", {qa:S.qa, current:S.promptCn || S.prompt, current_en:S.prompt,
+      feedback, model:modelParam(), w:S.w, h:S.h});
+    S.prompt = r.prompt_en || r.prompt; S.promptCn = r.prompt_cn || r.prompt;
+    S.w = r.w; S.h = r.h;
+    div.remove();
+    renderPromptCard("已根据建议重写提示词（英文生图词 · 中文说明），请再确认", r.refiner);
+  }catch(e){ addErr("重写失败：" + e.message); }
+}
+
+/* ── 主发送路由 ── */
+async function send(){
+  const t = inp.value.trim();
+  if (!t || S.stage === "gen") return;
+  inp.value = ""; addMe(t);
+  if (S.stage === "wish") return askQuestions(t);
+  if (S.stage === "questions"){
+    const i = S.sel.findIndex(x => !x);
+    if (i >= 0){ S.sel[i] = t;
+      const card = $("qsb").querySelectorAll(".qcard")[i];
+      const cinp = card.querySelector(".cinp");
+      if (cinp){ cinp.value = t;
+        card.querySelectorAll(".opt").forEach(o=>o.classList.remove("sel")); }
+      else card.insertAdjacentHTML("beforeend", `<div class="opts"><span class="opt sel">${esc(t)}</span></div>`);
+      scrollEnd();
+    }
+    return;
+  }
+  if (S.stage === "refineQ"){
+    const i = S.selQ.findIndex(x => !x);
+    if (i >= 0){ S.selQ[i] = t;
+      const card = $("eqb").querySelectorAll(".qcard")[i];
+      const cinp = card.querySelector(".cinp");
+      if (cinp){ cinp.value = t;
+        card.querySelectorAll(".opt").forEach(o=>o.classList.remove("sel")); }
+      else card.insertAdjacentHTML("beforeend", `<div class="opts"><span class="opt sel">${esc(t)}</span></div>`);
+      scrollEnd();
+    }
+    return;
+  }
+  if (S.stage === "confirm") return doRewrite(t);
+  if (S.stage === "refine") return doPlan(t);
+}
+inp.addEventListener("keydown", e => { if (e.key === "Enter") send(); });
+
+/* ── 画廊 / 看图 / 上传 ── */
+async function refreshGallery(){
+  try{
+    const r = await api("/api/gallery");
+    $("gallery").innerHTML = r.images.map(i =>
+      `<div class="gwrap"><img src="${i.url}" onclick="showLb('${i.url}')">
+       <span class="gdel" title="删除" onclick="event.stopPropagation(); delImage('${i.name}')">✕</span></div>`).join("");
+  }catch(e){}
+}
+async function delImage(name){
+  if(!confirm("删除这张图片？不可恢复。")) return;
+  try{ await api("/api/delete", {name}); }catch(e){ addErr("删除失败：" + e.message); }
+  if (S.lastImg === "/assets/"+name) S.lastImg = null;
+  if (S.attach && S.attach.endsWith(name)) S.attach = null;
+  refreshGallery();
+}
+function setSize(w,h){
+  S.params.w = w; S.params.h = h;
+  [["sz2",1024,1024],["sz1",1024,768],["sz3",768,1024]].forEach(([id,W,H]) =>
+    $(id).classList.toggle("sel", W===w && H===h));
+}
+function onDen(v){ S.params.den = v/100; $("vDen").textContent = (v/100).toFixed(2);
+  S.params.denLock = true; $("denLock").classList.add("on"); }
+function toggleDenLock(){
+  S.params.denLock = !S.params.denLock;
+  $("denLock").classList.toggle("on", S.params.denLock);
+  $("vDen").textContent = S.params.denLock ? S.params.den.toFixed(2) : "自动";
+}
+function initParams(){
+  $("pStp").oninput = e => { S.params.steps = +e.target.value; $("vStp").textContent = e.target.value; };
+  $("pGrow").oninput = e => { S.params.grow = +e.target.value; $("vGrow").textContent = e.target.value+"px"; };
+  $("pThr").oninput = e => { S.params.threshold = e.target.value/100; $("vThr").textContent = e.target.value/100; };
+  $("pSeed").oninput = e => { S.params.seed = e.target.value.trim() ? +e.target.value : null; };
+}
+function showLb(url){ $("lbimg").src = url; $("lb").classList.add("on"); $("lb").dataset.url = url; }
+function useAsInput(){ S.attach = $("lb").dataset.url; $("lb").classList.remove("on"); showAttach(); setStage("refine","这张图已挂载，描述想改的地方…"); inp.focus(); }
+function showAttach(){
+  if (!S.attach){ return; }
+  const name = S.attach.split("/").pop().split("\\").pop();
+  if (!$("attachchip")){
+    const d = document.createElement("div"); d.id = "attachchip";
+    d.className = "attach"; chat.parentElement.insertBefore(d, $("chat"));
+  }
+  $("attachchip").innerHTML = `🖼 挂载改图输入：<b>${esc(name)}</b><span onclick="S.attach=null;this.parentElement.remove()">✕</span>`;
+}
+function toggleSide(){ $("side").classList.toggle("on"); }
+function newSession(){
+  if (S.stage === "gen"){ alert("生成进行中，等它完成再开新会话"); return; }
+  location.reload();
+}
+function openFolder(){ fetch("/api/open_folder", {method:"POST"}); }
+async function uploadFile(f){
+  if (!f) return;
+  const r = await fetch("/api/upload", {method:"POST", body: f, headers:{"X-Filename": f.name}});
+  const j = await r.json();
+  S.attach = j.path; showAttach(); setStage("refine","图片已挂载，描述想改的地方…"); inp.focus();
+}
+/* 拖拽 + 粘贴上传 */
+document.addEventListener("dragover", e => { e.preventDefault(); $("dz").classList.add("on"); });
+document.addEventListener("dragleave", e => { if(e.target === $("dz")) $("dz").classList.remove("on"); });
+document.addEventListener("drop", e => {
+  e.preventDefault(); $("dz").classList.remove("on");
+  const f = e.dataTransfer.files[0]; if (f && f.type.startsWith("image/")) uploadFile(f);
+});
+document.addEventListener("paste", e => {
+  const it = [...(e.clipboardData?.items||[])].find(i=>i.type.startsWith("image/"));
+  if (it) uploadFile(it.getAsFile());
+});
+
+/* ── gemma 看图点评 ── */
+async function critique(img){
+  const image = img || S.lastImg;
+  if (!image){ addErr("先有一张生成图"); return; }
+  const div = addWizard("👀 向导正在看图点评…（gemma4 视觉模型，约 1-2 分钟）");
+  try{
+    const r = await api("/api/critique", {image, prompt:S.promptCn || S.prompt, model:zwishVision()});
+    window.CRIT = r;
+    div.querySelector(".who").insertAdjacentHTML("beforeend",
+      `<span class="mtag">🔍 点评 · ${esc(r.refiner)}</span>`);
+    div.querySelector(".bubble").innerHTML =
+      `<div class="promptcard"><div class="tag">👀 画面点评 · gemma4 视觉</div>
+       <div class="txt">${esc(r.overall||"")}</div></div>` +
+      (r.suggestions||[]).map((s,i)=>
+        `<div class="opts" style="margin:6px 0"><span class="opt" onclick="critApply(${i})">💡 ${esc(s)}</span></div>`).join("") +
+      `<div style="font-size:12px;color:var(--dim);margin-top:4px">点击任一建议 → 向导按它自动调整</div>`;
+  }catch(e){ div.querySelector(".bubble").innerHTML = `<span class="err">⚠ 点评失败：${esc(e.message)}</span>`; }
+}
+function critApply(i){
+  const s = window.CRIT.suggestions[i];
+  if (S.stage !== "refine") setStage("refine");
+  doPlan(s);
+}
+
+/* ── 历史记录 ── */
+const MODE_CN = {t2i:"文生图", img2img:"整图改", inpaint:"蒙版改"};
+function openHistory(){ $("histp").classList.add("on"); loadHistory(); }
+function closeHistory(){ $("histp").classList.remove("on"); }
+function fmtTime(ts){ const d=new Date(ts*1000);
+  return `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`; }
+async function loadHistory(){
+  const list = $("hlist");
+  list.innerHTML = '<div class="hempty">加载中…</div>';
+  try{
+    const r = await api("/api/history");
+    if (!r.records.length){ list.innerHTML = '<div class="hempty">还没有生成记录<br>去许第一个愿吧 ✨</div>'; return; }
+    window.HREC = r.records;
+    list.innerHTML = r.records.map((rec,i)=>`
+      <div class="hrec">
+        <div class="top">
+          <img src="/assets/${rec.image}" onerror="this.style.visibility='hidden'">
+          <div style="flex:1;min-width:0">
+            <div class="meta">
+              <span class="mchip">${MODE_CN[rec.mode]||rec.mode||""}</span>
+              <span class="mchip src">${rec.source==="web"?"网页":"CLI"}</span>
+              <span>${fmtTime(rec.ts)}</span><span>${rec.w||"·"}×${rec.h||""}</span><span>seed ${rec.seed}</span>
+              ${rec.segment?`<span>目标: ${esc(rec.segment)}</span>`:""}
+            </div>
+            <div class="pt" onclick="this.classList.toggle('open')" title="点击展开/收起英文生图词">${esc(rec.prompt_cn || rec.prompt)}</div>
+          </div>
+        </div>
+        <div class="acts">
+          <span onclick="histUse(${i})">🔁 载入继续改</span>
+          <span onclick="histReroll(${i})">🎲 同提示词重试</span>
+          <span onclick="histCopy(${i})">📋 复制提示词</span>
+          <span onclick="delHistRec(${i})">🗑 删除</span>
+        </div>
+      </div>`).join("");
+  }catch(e){ list.innerHTML = `<div class="hempty">加载失败: ${esc(e.message)}</div>`; }
+}
+function histUse(i){ const r = window.HREC[i];
+  S.prompt = r.prompt; S.promptCn = r.prompt_cn || r.prompt; S.w = r.w||1024; S.h = r.h||1024;
+  if (r.mode !== "t2i"){ S.attach = "/assets/"+r.image; showAttach(); }
+  renderPromptCard("已从历史载入提示词");
+  setStage("confirm","💬 交流修改或直接点生成…");
+  closeHistory(); addWizard("📜 已载入历史记录，可继续交流修改或直接生成"); }
+function histReroll(i){ const r = window.HREC[i]; closeHistory();
+  generate({prompt:r.prompt, prompt_en:r.prompt, prompt_cn:r.prompt_cn||r.prompt, w:r.w, h:r.h,
+            img: r.mode!=="t2i" ? "/assets/"+r.image : null,
+            segment: r.mode==="inpaint" ? r.segment : null, denoise: r.denoise}); }
+function histCopy(i){ navigator.clipboard.writeText(window.HREC[i].prompt)
+  .then(()=>addWizard("📋 提示词已复制到剪贴板")); }
+async function delHistRec(i){
+  const r = window.HREC[i];
+  if (!confirm("删除这条记录和对应图片？图片文件不可恢复。")) return;
+  try{ await api("/api/delete_history", {ts:r.ts, image:r.image}); }catch(e){}
+  try{ await api("/api/delete", {name:r.image}); }catch(e){}
+  loadHistory(); refreshGallery();
+}
+async function clearHist(){
+  if (!confirm("清空全部生成记录？（只清记录，图片文件保留）")) return;
+  try{ await api("/api/clear_history", {}); }catch(e){}
+  loadHistory();
+}
+
+initParams();
+setSize(1024,1024);
+refreshGallery();
+refreshCloudSel();
+
+/* ── 设置面板（供应商 / 内置提示词）── */
+function openSettings(){ setSetTab("prov"); loadProvidersUI(); $("setp").classList.add("on"); }
+function closeSettings(){ $("setp").classList.remove("on"); }
+function setSetTab(which){
+  const isProv = which === "prov";
+  $("tabProv").classList.toggle("on", isProv);
+  $("tabPrompt").classList.toggle("on", !isProv);
+  $("viewProv").style.display = isProv ? "flex" : "none";
+  $("viewPrompt").style.display = isProv ? "none" : "flex";
+  if (!isProv) loadPromptsUI();
+}
+
+/* ── 内置提示词自定义 ── */
+let PROMPT_STATE = null;
+async function loadPromptsUI(){
+  const box = $("pbody");
+  try{
+    const r = await api("/api/prompts");
+    PROMPT_STATE = r;
+    const custom = new Set(r.custom || []);
+    const extra = r.labels_extra || {};
+    const items = Object.entries(r.effective || {}).map(([key, text]) => {
+      const lab = (r.labels && r.labels[key]) || extra[key] || {name:key, desc:""};
+      const isDef = (r.defaults[key] || "") === text;
+      return `<div class="pitem ${custom.has(key)?"custom":""}" data-key="${esc(key)}">
+        <div class="ph"><b>${esc(lab.name)}</b>${custom.has(key)?'<span class="badge">已自定义</span>':'<span class="badge" style="background:#EFEAE3;color:var(--dim)">默认</span>'}</div>
+        <div class="pdesc">${esc(lab.desc||"")}</div>
+        <textarea data-prompt="${esc(key)}" spellcheck="false">${esc(text)}</textarea>
+        <div class="pops"><span class="mini" onclick="resetOnePrompt('${esc(key)}')">恢复此条</span></div>
+      </div>`;
+    }).join("");
+    box.innerHTML = items || '<div class="hempty">没有可编辑的提示词</div>';
+  }catch(e){ box.innerHTML = `<div class="err">加载失败：${esc(e.message||e)}</div>`; }
+}
+function resetOnePrompt(key){
+  if (!PROMPT_STATE) return;
+  const def = PROMPT_STATE.defaults[key] || "";
+  const ta = document.querySelector(`textarea[data-prompt="${CSS.escape(key)}"]`);
+  if (ta) ta.value = def;
+  addWizard(`已把「${key}」恢复为默认文本，记得点「保存提示词」`);
+}
+async function resetAllPrompts(){
+  if (!confirm("把所有内置提示词恢复为默认值？（保存后立即生效）")) return;
+  try{
+    await api("/api/save_prompts", {prompts:{}});
+    await loadPromptsUI();
+    addWizard("♻️ 已恢复全部默认提示词");
+  }catch(e){ addErr("恢复失败：" + e.message); }
+}
+async function savePrompts(){
+  const prompts = {};
+  document.querySelectorAll("#pbody textarea[data-prompt]").forEach(ta => {
+    prompts[ta.dataset.prompt] = ta.value;
+  });
+  try{
+    const r = await api("/api/save_prompts", {prompts});
+    await loadPromptsUI();
+    addWizard(`💾 提示词已保存，DS · 网页 / API / 云端通道立即生效（自定义 ${r.custom.length} 条）`);
+  }catch(e){ addErr("保存失败：" + e.message); }
+}
+async function loadProvidersUI(){
+  try{ const r = await api("/api/providers"); S.provs = r.providers || []; }
+  catch(e){ S.provs = []; }
+  renderSettings();
+}
+function collectProv(i){
+  const card = $("sbody").querySelectorAll(".prov")[i];
+  if (!card) return;
+  const p = S.provs[i];
+  card.querySelectorAll("[data-f]").forEach(inp => {
+    const f = inp.dataset.f;
+    if (f === "models") p.models = inp.value.split(/[,，]/).map(s=>s.trim()).filter(Boolean);
+    else if (f === "on") p.on = inp.checked;
+    else p[f] = inp.value;
+  });
+}
+function renderSettings(){
+  const el = $("sbody");
+  el.innerHTML = S.provs.map((p,i)=>`
+    <div class="prov ${p.on===false?"off":""}">
+      <div class="prow"><label>名称</label>
+        <input data-f="name" data-i="${i}" value="${esc(p.name||"")}">
+        <label class="sw"><input type="checkbox" data-f="on" data-i="${i}" ${p.on!==false?"checked":""}> 启用</label>
+        <span class="mini" style="width:auto" onclick="delProv(${i})">🗑</span></div>
+      <div class="prow"><label>Base URL</label>
+        <input data-f="base" data-i="${i}" value="${esc(p.base||"")}" placeholder="https://api.deepseek.com/v1"></div>
+      <div class="prow"><label>API 格式</label>
+        <select data-f="format" data-i="${i}">
+          <option value="openai" ${(p.format||"openai")==="openai"?"selected":""}>OpenAI (chat/completions)</option>
+          <option value="anthropic" ${p.format==="anthropic"?"selected":""}>Anthropic (/v1/messages)</option>
+        </select></div>
+      <div class="prow"><label>API Key</label>
+        <input type="password" data-f="key" data-i="${i}" value="${esc(p.key||"")}"></div>
+      <div class="prow"><label>模型列表</label>
+        <input data-f="models" data-i="${i}" value="${esc((p.models||[]).join(", "))}" placeholder="model-a, model-b（逗号分隔）"></div>
+      <div class="prow"><span class="mini" style="width:auto" onclick="testProv(${i})">🧪 测试连接</span>
+        <span class="tres" id="tres${i}"></span></div>
+    </div>`).join("") || '<div class="hempty">还没有供应商，点下方「➕ 新供应商」</div>';
+  el.querySelectorAll("[data-f]").forEach(inp => {
+    inp.onchange = () => collectProv(+inp.dataset.i);
+    inp.oninput = () => collectProv(+inp.dataset.i);
+  });
+}
+function presetDeepSeek(){
+  collectAll();
+  const existing = S.provs.find(p => (p.name||"").toLowerCase()==="deepseek");
+  if (existing){
+    if (!existing.base) existing.base = "https://api.deepseek.com";
+    if (!existing.format) existing.format = "openai";
+    if (!existing.models || !existing.models.length) existing.models = ["deepseek-chat","deepseek-reasoner"];
+    existing.on = true;
+    addWizard("⚡ 已补全 DeepSeek 预置，请填写 API Key 后保存");
+  } else {
+    S.provs.push({name:"DeepSeek", base:"https://api.deepseek.com", format:"openai",
+                  key:"", models:["deepseek-chat","deepseek-reasoner"], on:true});
+    addWizard("⚡ 已添加 DeepSeek 预置，请填写 API Key 后保存");
+  }
+  renderSettings();
+}
+function addProv(){
+  collectAll();
+  S.provs.push({name:"新供应商", base:"", format:"openai", key:"", models:[], on:true});
+  renderSettings();
+}
+function delProv(i){ collectAll(); S.provs.splice(i,1); renderSettings(); }
+async function saveSettings(){
+  collectAll();
+  try{
+    const r = await api("/api/save_providers", {providers: S.provs});
+    S.provs = r.providers; renderSettings(); refreshCloudSel();
+    addWizard("💾 供应商配置已保存，☁️ 云端下拉已更新"); closeSettings();
+  }catch(e){ addErr("保存失败：" + e.message); }
+}
+async function testProv(i){
+  collectProv(i);
+  const el = $("tres"+i);
+  el.textContent = "测试中…"; el.className = "tres";
+  try{
+    const r = await api("/api/test_provider", {provider: S.provs[i]});
+    el.textContent = `✅ ${r.elapsed}s · 回复: ${r.reply}`; el.classList.add("ok");
+  }catch(e){ el.textContent = "❌ " + e.message; el.classList.add("bad"); }
+}
+function collectAll(){ document.querySelectorAll("#sbody .prov").forEach((card,i) => collectProv(i)); }
+async function refreshCloudSel(){
+  try{
+    const r = await api("/api/providers");
+    const ps = (r.providers||[]).filter(p => p.on !== false);
+    const opts = ps.flatMap(p => (p.models||[]).map(m => ({v: `${p.name}/${m}`, t: `${p.name} / ${m}`})));
+    const sel = $("cloudSel");
+    if (!opts.length){ sel.style.display = "none"; return; }
+    sel.innerHTML = opts.map(o=>`<option value="${esc(o.v)}">${esc(o.t)}</option>`).join("");
+    if (!opts.some(o=>o.v===S.cloudSel)) S.cloudSel = opts[0].v;
+    sel.value = S.cloudSel;
+    sel.style.display = S.model==="cloud" ? "" : "none";
+  }catch(e){}
+}
+setSize(1024,1024);
+refreshGallery();
+/* 云端芯片：配置了 cloud.json 才显示 */
+(async () => { try{ const c = await api("/api/config");
+  if (c.cloud) $("chipCloud").style.display = "";
+  if (c.vision_model) S.visionModel = c.vision_model;
+  if (c.comfy_port) S.comfyPort = c.comfy_port;
+  if (c.ask_count){ S.askCfg = c.ask_count; S.askCount = askRecommended(); }
+  renderAskBtns();
+  S.dsWebOk = !!(c.ds_web && c.ds_web.ok);
+  S.dsWebMsg = (c.ds_web && c.ds_web.msg) || "";
+  $("chipDsWeb").title = c.ds_web && c.ds_web.ok
+    ? ("内置提示词，浏览器自动化 deepseek.com（已就绪）\n" + S.dsWebMsg)
+    : ("DS 网页通道未就绪：" + (S.dsWebMsg || "未检测到本机浏览器，无需 playwright"));
+  if (!c.ready) addErr("ComfyUI 路径未配置：请把 config.example.json 复制为 config.json 并填写 base_dir（生图会失败）");
+}catch(e){} })();
+
+</script>
+</body>
+</html>
