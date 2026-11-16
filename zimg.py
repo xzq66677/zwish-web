@@ -29,11 +29,12 @@ SAM_CKPT = CFG["models"]["sam_ckpt"]
 
 
 def http_json(path, payload=None, timeout=30):
+    """本机 ComfyUI 请求：显式直连，避免系统代理劫持 loopback。"""
     if payload is None:
-        return json.load(urllib.request.urlopen(HOST + path, timeout=timeout))
+        return json.load(zconfig.urlopen_local(HOST + path, timeout=timeout))
     req = urllib.request.Request(HOST + path, data=json.dumps(payload).encode(),
                                  headers={"Content-Type": "application/json"})
-    return json.load(urllib.request.urlopen(req, timeout=timeout))
+    return json.load(zconfig.urlopen_local(req, timeout=timeout))
 
 
 def ensure_server():
@@ -58,8 +59,15 @@ def ensure_server():
         f"'--listen', '127.0.0.1', '--port', '{port}') -WorkingDirectory (Split-Path $main) "
         f"-RedirectStandardOutput '{log_out}' -RedirectStandardError '{log_err}' -WindowStyle Hidden"
     )
-    subprocess.run(["powershell", "-NoProfile", "-Command", ps], check=True,
-                   capture_output=True, timeout=60)
+    # 不要用 capture_output=True：Start-Process 拉起的 ComfyUI 是长期进程，
+    # 会继承管道句柄，导致 communicate() 等不到 EOF、subprocess.run 卡死。
+    # ComfyUI 自身输出已由 ps 里的 -RedirectStandardOutput/-RedirectStandardError
+    # 写入独立日志；启动器（PowerShell）的输出这里写到一个普通文件句柄——
+    # 用文件而非管道，既不会卡在等 EOF，又保留了启动失败时的错误信息便于排查。
+    launch_log = os.path.join(root, "comfyui.launcher.log")
+    with open(launch_log, "a", encoding="utf-8", errors="replace") as lf:
+        subprocess.run(["powershell", "-NoProfile", "-Command", ps], check=True,
+                       stdout=lf, stderr=lf, timeout=60)
     for _ in range(90):
         try:
             http_json("/system_stats", timeout=3)

@@ -9,6 +9,8 @@
 import json
 import os
 import sys
+import urllib.parse
+import urllib.request
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
@@ -140,6 +142,77 @@ def load():
 
 
 CFG = load()
+
+
+# ── 本机 loopback 请求：显式不走代理 ─────────────────────────────
+# Windows 开启系统代理且 ProxyOverride 未包含 loopback 时，urllib 会读取
+# WinINET 代理配置，把 127.0.0.1 / localhost / ::1 的回环请求也转发给代理，
+# 导致本机 Ollama / ComfyUI / CDP 返回 404。
+# 这里为"访问本机服务"单独建一个禁用代理的 opener；云端请求（DeepSeek API /
+# 通用云端供应商 / 模型下载）仍走默认 opener，遵循系统代理设置。
+# 不要用 install_opener 全局替换 —— 那会让云端请求也失去代理能力。
+LOCAL_OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+
+
+def urlopen_local(url, data=None, timeout=None):
+    """访问本机 loopback 服务时专用：强制直连，不经任何系统代理。
+
+    用法与 urllib.request.urlopen 一致，仅用于 Ollama / ComfyUI / 本机 CDP。
+    """
+    if timeout is not None:
+        return LOCAL_OPENER.open(url, data=data, timeout=timeout)
+    return LOCAL_OPENER.open(url, data=data)
+
+
+def _is_loopback(url):
+    """判断请求的主机是否为本机回环地址（支持 str 或 urllib Request）。"""
+    raw = getattr(url, "full_url", url)  # Request 对象取 full_url
+    host = urllib.parse.urlparse(str(raw)).hostname
+    if not host:
+        return False
+    host = host.strip("[]").lower()  # IPv6 形如 [::1]
+    return host in ("localhost", "::1") or host.startswith("127.")
+
+
+def urlopen_auto(url, data=None, timeout=None):
+    """按目标主机自动选路：本机 loopback 直连，其余遵循系统代理。
+
+    供"base 地址由用户配置"的通用云端通道使用：默认是公网云端（走系统代理），
+    但用户也可能把它指向本机的 OpenAI 兼容服务（如 127.0.0.1:1234 的 LM Studio），
+    此时若仍走系统代理就会复现 Issue #1 的 404。此函数按主机判断，两种场景都对。
+
+    用法与 urllib.request.urlopen 一致。
+    """
+    is_local = _is_loopback(url)
+    if is_local:
+        # LOCAL_OPENER.open：显式禁用代理
+        if timeout is not None:
+            return LOCAL_OPENER.open(url, data=data, timeout=timeout)
+        return LOCAL_OPENER.open(url, data=data)
+    # 公网目标：走默认 opener，遵循系统代理
+    if timeout is not None:
+        return urllib.request.urlopen(url, data=data, timeout=timeout)
+    return urllib.request.urlopen(url, data=data)
+
+
+def ensure_loopback_noproxy():
+    """把 loopback 主机补进 no_proxy 环境变量（兼容措施，不覆盖已有值）。
+
+    代码层的 LOCAL_OPENER / urlopen_auto 已是主修复，不依赖此环境变量。
+    这里仅为照顾遵循 no_proxy 约定的非 urllib 组件（如 curl、部分 CLI 工具）。
+    注意：Windows 上的 Chrome/Edge 主要读注册表 WinINET 设置而非 no_proxy，
+    因此不要指望此函数改变浏览器行为；CDP 通道由原生 socket + urlopen_local 保证直连。
+    """
+    loopback = ("localhost", "127.0.0.1", "::1")
+    for var in ("no_proxy", "NO_PROXY"):
+        cur = os.environ.get(var, "")
+        have = {p.strip().lower() for p in cur.split(",") if p.strip()}
+        add = [h for h in loopback if h.lower() not in have]
+        if add:
+            os.environ[var] = (cur + "," if cur else "") + ",".join(add)
+
+
+ensure_loopback_noproxy()
 
 
 def ask_recommend(model):

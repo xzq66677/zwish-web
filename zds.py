@@ -313,7 +313,7 @@ class _Browser:
                 "请关闭 data/ds_profile 对应的浏览器后重试；服务器环境可在 config.json 设 ds_web_headless=true。")
         self.port = port
         try:
-            ver = json.loads(urllib.request.urlopen(
+            ver = json.loads(zconfig.urlopen_local(
                 f"http://127.0.0.1:{port}/json/version", timeout=10).read())
             self.browser_ws = ver.get("webSocketDebuggerUrl")
         except Exception as e:
@@ -325,7 +325,7 @@ class _Browser:
         target = urllib.parse.quote(url, safe=":/?=&%#")
         req = urllib.request.Request(
             f"http://127.0.0.1:{self.port}/json/new?{target}", method="PUT")
-        tab = json.loads(urllib.request.urlopen(req, timeout=15).read())
+        tab = json.loads(zconfig.urlopen_local(req, timeout=15).read())
         self.ws = _WS(tab["webSocketDebuggerUrl"], timeout=30)
         self.ws.call("Page.enable")
         self.ws.call("Runtime.enable")

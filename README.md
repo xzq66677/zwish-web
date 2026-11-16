@@ -4,7 +4,7 @@
 >
 > 特点：**提示词润色支持本地 / DeepSeek API / DeepSeek 网页多通道**；**对话用中文，真正生图用英文提示词**；看图与点评始终走本地视觉模型，图片不出本机。
 
-> [!TIP]
+> [!TIP]  
 > **第一次使用？先看 👉 [DEPLOYMENT.md（配置说明 + 本地模型部署 + 下载链接 + 一键安装脚本）](DEPLOYMENT.md)** —— 本文下面的「快速开始」只讲怎么跑起来，模型的下载、显存要求、逐项配置都在这份文档里。
 >
 > **想一键装好依赖和模型？** 终端运行 `python install.py`，脚本会列出要下载的东西、实时显示进度/速度/剩余时间。详见 [DEPLOYMENT.md 的一键安装脚本节](DEPLOYMENT.md#一一键安装脚本installpy)。
@@ -12,12 +12,12 @@
 ## 界面预览
 
 | 许愿 → 追问 | 中英双字段精修卡片 |
-|---|---|
-| ![许愿追问](docs/screenshots/02-questions.png) | ![精修卡片](docs/screenshots/03-prompt-card.png) |
+| ------- | --------- |
+| 许愿追问    | 精修卡片      |
 
 | 云端供应商设置 | 内置提示词自定义 |
-|---|---|
-| ![供应商设置](docs/screenshots/04-settings-providers.png) | ![提示词设置](docs/screenshots/05-settings-prompts.png) |
+| ------- | -------- |
+| 供应商设置   | 提示词设置    |
 
 > 截图为界面演示（对话内容为示例数据）。完整主界面见 [docs/screenshots/01-main.png](docs/screenshots/01-main.png)；追问问题数的「跟随模型」态见 [06-ask-count.png](docs/screenshots/06-ask-count.png)、「⚡ 一次问清」态见 [07-ask-once.png](docs/screenshots/07-ask-once.png)。
 
@@ -28,13 +28,13 @@
 - **许愿式向导**：愿望 → 追问 → 精修 → 生成 → 无限轮对话微调；**追问数量三态可选**：🎯 跟随模型（本地少问 / 云端多问）、⚡ 一次问清（不再精修，用足上下文把细节一次问透）、手动 1–8
 - **中英双字段精修**：对话区展示中文说明 `prompt_cn`，真正送进生图模型的是结构化英文词 `prompt_en`
 - **多润色通道**（可随时用顶部标签切换）：
-  | 通道 | 说明 | 是否需要联网 |
-  |---|---|---|
-  | 自由模式 | 本地模型，忠实执行你的想法 | 否 |
-  | 精细润色 | 本地 `qwen3:8b`，润色更细腻、更有导演感 | 否 |
-  | DS · API | DeepSeek 官方 API，**内置提示词** | 是（需 API Key） |
-  | DS · 网页 | CDP 控制本机浏览器访问 `chat.deepseek.com`，**零额外依赖 + 内置提示词** | 是（需登录一次） |
-  | ☁️ 云端 | 设置面板里任意 OpenAI/Anthropic 兼容供应商 | 是 |
+  | 通道       | 说明                                                  | 是否需要联网       |
+  | -------- | --------------------------------------------------- | ------------ |
+  | 自由模式     | 本地模型，忠实执行你的想法                                       | 否            |
+  | 精细润色     | 本地 `qwen3:8b`，润色更细腻、更有导演感                           | 否            |
+  | DS · API | DeepSeek 官方 API，**内置提示词**                           | 是（需 API Key） |
+  | DS · 网页  | CDP 控制本机浏览器访问 `chat.deepseek.com`，**零额外依赖 + 内置提示词** | 是（需登录一次）     |
+  | ☁️ 云端    | 设置面板里任意 OpenAI/Anthropic 兼容供应商                      | 是            |
 - **生图三模式**：文生图 / img2img 整图改 / SAM 3 自动蒙版局部重绘
 - **看图点评**：本地视觉模型看着图给建议，一键应用
 - **历史记录**：提示词 / 参数 / 种子 / 耗时落盘，可载入继续改、复制、删除
@@ -188,6 +188,40 @@ python zimg.py --img photo.png --segment "cat" "a white kitten in a spacesuit"
 - **DS API 报「API Key 为空」/「未找到供应商」**：到设置面板一键预置并填 Key，或检查 `providers.json`。
 - **DS 网页读不到回复**：DeepSeek 页面结构可能变化，在 `config.json` 的 `ds_web_selectors` 更新选择器。
 - **一张图里有多个人物时效果偏弱**：这是 **Z-Image-Turbo 8 步蒸馏模型的固有局限**（官方标注 Diversity=Low，非代码缺陷；本项目工作流参数已符合官方推荐）。用"1–2 个主体 + 场景关系"的提示词、批量多出几张挑选、或先生成单人再局部加人，可明显改善。完整原因与 4 种应对方案见 [DEPLOYMENT.md 第十一节](DEPLOYMENT.md#十一已知限制一张图里有多个人物时效果偏弱)。
+
+---
+
+## 变更记录
+
+### 2026-11-16 · 本机请求代理与启动器修复
+
+本轮集中修复了 Windows 环境下三个相互独立的问题，均带回归测试（共 22 项断言全部通过）。
+
+**#1 — 系统代理开启时，本机服务请求被代理返回 404**
+
+- **现象**：Windows 开启系统代理且绕过列表未含 loopback 时，`urllib` 读取 WinINET 代理配置，把发往 `127.0.0.1` / `localhost` / `::1` 的 Ollama、ComfyUI、CDP 请求也转发给代理，导致「自由模式」追问、生图、看图点评全部 404。
+- **修复**（`zconfig.py` / `zwish.py` / `zimg.py` / `zds.py`）：新增无代理 opener `LOCAL_OPENER` 与 `urlopen_local()`，所有本机请求强制直连；云端 API 与模型下载仍走默认 opener，遵循系统代理，**不受影响**。未使用全局 `install_opener`，避免误伤云端。
+- **回归**：`tests/test_loopback_no_proxy.py`（7/7）。
+
+**#2 — 首次生图自动启动 ComfyUI 后卡住**
+
+- **现象**：`ensure_server()` 用 `capture_output=True` 启动 PowerShell，其拉起的 ComfyUI 长期进程继承了 stdout/stderr 管道句柄，`subprocess.run()` 等不到 EOF 而一直阻塞。
+- **修复**（`zimg.py`）：启动器输出改写到普通日志文件句柄（非管道），既不卡在等 EOF，又保留了启动失败时的错误信息。
+- **回归**：`tests/test_ensure_server_no_hang.py`（5/5）。
+
+**#3 — 代码审查发现的边界遗漏**
+
+- **现象**：通用云端通道（`#1` 之外）的 `base` 若被配置成本机 OpenAI 兼容服务（如 `127.0.0.1:1234` 的 LM Studio），原先仍走系统代理，会复现与 #1 相同的 404。
+- **修复**（`zconfig.py` / `zwish.py`）：新增 `urlopen_auto()`，按目标主机自动选路——本机 loopback 直连、公网地址走代理；`llm_cloud()` 的两处请求改用此函数，两种场景都正确。同时修正了 `no_proxy` 相关注释（Windows 浏览器主要读注册表，不依赖该环境变量）。
+- **说明**：经实测，Python `urllib` 的 `no_proxy` 不支持 CIDR（`127.0.0.0/8`）或 `127.` 前缀写法；主修复不依赖 `no_proxy`，故未采用该兜底方案。
+- **回归**：`tests/test_urlopen_auto.py`（10/10）。
+
+> 运行全部回归：
+> ```bash
+> python tests/test_loopback_no_proxy.py
+> python tests/test_ensure_server_no_hang.py
+> python tests/test_urlopen_auto.py
+> ```
 
 ---
 
