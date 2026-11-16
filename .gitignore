@@ -1,0 +1,32 @@
+# ── 私有配置与密钥（绝不入库）────────────────────────────
+config.json
+providers.json
+cloud.json
+prompts.json
+
+# ── 本机生成数据 ─────────────────────────────────────────
+data/
+uploads/
+history.jsonl
+mockups/
+
+# ── DeepSeek 网页登录态（含 cookie，绝不入库）────────────
+ds_profile/
+
+# ── 图片：默认忽略生成图，但保留文档演示截图 ──────────────
+*.png
+!docs/
+!docs/screenshots/
+!docs/screenshots/*.png
+
+# ── Python ───────────────────────────────────────────────
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# ── 其他 ─────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+*.log
