@@ -33,7 +33,7 @@
   | 自由模式 | 本地模型，忠实执行你的想法 | 否 |
   | 精细润色 | 本地 `qwen3:8b`，润色更细腻、更有导演感 | 否 |
   | DS · API | DeepSeek 官方 API，**内置提示词** | 是（需 API Key） |
-  | DS · 网页 | Playwright 自动化 `chat.deepseek.com`，**内置提示词** | 是（需登录一次） |
+  | DS · 网页 | CDP 控制本机浏览器访问 `chat.deepseek.com`，**零额外依赖 + 内置提示词** | 是（需登录一次） |
   | ☁️ 云端 | 设置面板里任意 OpenAI/Anthropic 兼容供应商 | 是 |
 - **生图三模式**：文生图 / img2img 整图改 / SAM 3 自动蒙版局部重绘
 - **看图点评**：本地视觉模型看着图给建议，一键应用
@@ -51,7 +51,7 @@ zwish-web-github/
 ├── zwish.py                # 向导核心：追问/精修/重写/规划 + 多通道路由
 ├── zimg.py                 # 生图 CLI：文生图/img2img/SAM3 inpaint
 ├── zprompts.py             # 内置提示词模板（多通道共用，可被用户覆盖）
-├── zds.py                  # DeepSeek 网页自动化（Playwright，按需）
+├── zds.py                  # DeepSeek 网页自动化（CDP 控制本机浏览器，零依赖，按需）
 ├── zconfig.py              # 唯一的路径/模型配置来源
 ├── install.py              # 懒人一键安装向导（列清单 + 进度/速度/断点续传）
 ├── config.example.json     # 配置模板 → 复制为 config.json
@@ -68,7 +68,7 @@ zwish-web-github/
 
 - **生图**：本地 ComfyUI（含 Z-Image Turbo / Qwen3 文本编码器 / Z-Image VAE / SAM 3.1），服务地址 `127.0.0.1:XX`（XX 为可配置端口，见 `DEPLOYMENT.md`）。首次运行会自动拉起 ComfyUI。
 - **对话精修**：本地 [Ollama](https://ollama.com/)（默认 `127.0.0.1:11434`），至少有一个模型。
-- **看图 / 点评**：Ollama 里的多模态模型（默认 `gemma4-cc`，可配）。
+- **看图 / 点评**：Ollama 里的多模态模型（默认 `gemma3:4b`，与安装脚本一致，可配）。
 - **Python 3.9+**，Web 服务本身只用标准库。
 
 > 各模型的**推荐版本、显存要求与下载链接**，见 **[DEPLOYMENT.md](DEPLOYMENT.md)**。
