@@ -13,7 +13,7 @@
   "refiner_keyword": "abliterated",
   "fallback_refiner": "qwen3:8b",
   "fine_model": "qwen3:8b",
-  "vision_model": "gemma4-cc",
+  "vision_model": "gemma3:4b",
 
   "models": {
     "unet": "z_image_turbo_int8_convrot.safetensors",
@@ -32,8 +32,8 @@
     "cloud_recommend": 4
   },
 
-  "_DS网页说明": "「DS · 网页」通道用 Playwright 自动化 deepseek.com。headless=false 首次会打开浏览器让你登录，登录态存 data/ds_profile。网页改版导致找不到输入框/回复时，调整下面的选择器。",
-  "_ds_web_browser说明": "用哪个浏览器。auto=优先本机 Chrome/Edge（推荐，无需下载 chromium），找不到才用 Playwright 自带；也可填 chrome / msedge / chromium / 自定义 exe 绝对路径。",
+  "_DS网页说明": "「DS · 网页」通道用 CDP（Chrome DevTools Protocol）直接控制本机浏览器访问 deepseek.com，零额外依赖，无需安装 playwright。headless=false 首次会打开浏览器让你登录，登录态存 data/ds_profile。网页改版导致找不到输入框/回复时，调整下面的选择器。",
+  "_ds_web_browser说明": "用哪个浏览器。auto=优先本机 Chrome/Edge/Chromium（推荐，零下载）；也可填 chrome / msedge / chromium / 自定义 exe 绝对路径。本机需已装任意一款浏览器。",
   "ds_web_browser": "auto",
   "ds_web_chat_url": "https://chat.deepseek.com/",
   "ds_web_headless": false,
