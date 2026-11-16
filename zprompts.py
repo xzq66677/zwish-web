@@ -1,7 +1,7 @@
 """zprompts - 全部内置提示词模板，集中管理、可被用户覆盖。
 
 为什么独立成模块：
-  1. API 路（DeepSeek / OpenAI 兼容）与网页路（Playwright 自动化 deepseek.com）
+  1. API 路（DeepSeek / OpenAI 兼容）与网页路（CDP 控制本机浏览器访问 deepseek.com）
      必须共用**同一套内置提示词**，行为才能一致；
   2. 云端/网页通道要求内置提示词——这些模板固定注入，不随用户对话漂移；
   3. 中英双字段：中文说明给对话区展示，english_prompt 才是真正送进 ComfyUI 的生图提示词。
