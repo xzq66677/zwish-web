@@ -8,7 +8,7 @@ Agent 调用: python zwish.py questions|prompt|plan --json ...
   auto            本地自由模式（abliterated，忠实执行）
   __local_fine__   本地精细润色（qwen3:8b）
   __ds_api__       DeepSeek API（云端，内置提示词）
-  __ds_web__       DeepSeek 网页自动化（内置提示词，Playwright）
+  __ds_web__       DeepSeek 网页自动化（内置提示词，CDP 零依赖）
   __cloud__:供应商/模型  通用云端（OpenAI/Anthropic 兼容）
 
 精修统一输出中英双字段：prompt_cn（对话展示）+ prompt_en（送进生图）。
@@ -155,7 +155,7 @@ def llm_ds_api(system, user):
 
 
 def llm_ds_web(system, user):
-    """DeepSeek 网页自动化通道，使用内置提示词（Playwright）。"""
+    """DeepSeek 网页自动化通道，使用内置提示词（CDP 控制本机浏览器，零额外依赖）。"""
     import zds
     text = zds.web_chat(system, user)
     return text, "DeepSeek/网页"
