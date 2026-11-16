@@ -206,7 +206,7 @@ ComfyUI/
 - Gemma 3 官方页：https://ollama.com/library/gemma3
 - Qwen3-VL 官方页：https://ollama.com/library/qwen3-vl
 
-> 本项目默认 `vision_model` 写的是 `gemma4-cc`（你本机的自定义别名）。如果你按上表装了 `gemma3:12b`，请把 `config.json` 的 `vision_model` 改成 `gemma3:12b`。
+> 本项目默认 `vision_model` 为 `gemma3:4b`，与一键安装脚本拉取的看图模型一致，全新安装即可直接用。若你显存充足、按上表装了 `gemma3:12b` 等更大的模型，把 `config.json` 的 `vision_model` 改成对应名字即可。
 
 ### 5.4 装好后核对
 
@@ -239,7 +239,7 @@ ollama list          # 列出已安装模型，确认名字
 | `refiner_keyword` | `abliterated` | `auto` 模式下的匹配关键词。装了别的自由模式模型就改这里 |
 | `fallback_refiner` | `qwen3:8b` | 扫描不到时的兜底模型 |
 | `fine_model` | `qwen3:8b` | 前端「精细润色」通道使用的本地模型 |
-| `vision_model` | `gemma4-cc` | 看图/点评的多模态模型。按你实际装的改，如 `gemma3:12b` |
+| `vision_model` | `gemma3:4b` | 看图/点评的多模态模型，默认与安装脚本一致。按你实际装的改，如 `gemma3:12b` |
 
 ### 6.3 ComfyUI 模型文件名
 
