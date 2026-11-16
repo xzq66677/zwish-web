@@ -3,10 +3,11 @@
 
 对应 Issue #2：capture_output=True 时，PowerShell Start-Process 拉起的
 ComfyUI 长期进程继承 stdout/stderr 管道，subprocess.run 等不到 EOF 卡死。
-修复改用 stdout/stderr=DEVNULL。
+修复改用 stdout/stderr=非管道目标（DEVNULL 或普通日志文件句柄），
+避免创建会被继承的管道，同时保留启动错误信息便于排查。
 
 本测试用标准库在任意平台复现"子进程继承管道句柄导致 communicate 阻塞"的
-机制，并断言源码中 ensure_server 已采用 DEVNULL 而非 capture_output。
+机制，并断言源码中 ensure_server 未使用 capture_output / PIPE。
 运行： python tests/test_ensure_server_no_hang.py
 """
 import os
@@ -65,9 +66,14 @@ def main():
                 and node.func.attr == "run"):
             run_kwargs = [kw.arg for kw in node.keywords]
             break
-    check("ensure_server 使用 DEVNULL", "subprocess.DEVNULL" in src)
-    check("ensure_server 的 subprocess.run 不再传 capture_output 参数",
+    # 核心保证：绝不用 capture_output / PIPE（会制造继承句柄导致卡死）。
+    # stdout/stderr 用 DEVNULL 或普通文件句柄都可接受（均非管道）。
+    check("ensure_server 未使用 capture_output",
           "capture_output" not in (run_kwargs or []),
+          f"run kwargs={run_kwargs}")
+    check("ensure_server stdout/stderr 用非管道目标（DEVNULL 或文件句柄）",
+          ("stdout" in run_kwargs and "stderr" in run_kwargs)
+          and "subprocess.PIPE" not in src,
           f"run kwargs={run_kwargs}")
 
     passed = sum(1 for _, ok in RESULTS if ok)

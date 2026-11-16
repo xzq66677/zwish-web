@@ -61,10 +61,13 @@ def ensure_server():
     )
     # 不要用 capture_output=True：Start-Process 拉起的 ComfyUI 是长期进程，
     # 会继承管道句柄，导致 communicate() 等不到 EOF、subprocess.run 卡死。
-    # ComfyUI 输出已由 ps 里的 -RedirectStandardOutput/-RedirectStandardError
-    # 写入独立日志，启动器本身无需捕获，重定向到 DEVNULL 即可立即返回。
-    subprocess.run(["powershell", "-NoProfile", "-Command", ps], check=True,
-                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=60)
+    # ComfyUI 自身输出已由 ps 里的 -RedirectStandardOutput/-RedirectStandardError
+    # 写入独立日志；启动器（PowerShell）的输出这里写到一个普通文件句柄——
+    # 用文件而非管道，既不会卡在等 EOF，又保留了启动失败时的错误信息便于排查。
+    launch_log = os.path.join(root, "comfyui.launcher.log")
+    with open(launch_log, "a", encoding="utf-8", errors="replace") as lf:
+        subprocess.run(["powershell", "-NoProfile", "-Command", ps], check=True,
+                       stdout=lf, stderr=lf, timeout=60)
     for _ in range(90):
         try:
             http_json("/system_stats", timeout=3)

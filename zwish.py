@@ -125,14 +125,14 @@ def llm_cloud(p, model, system, user):
                              "messages": [{"role": "user", "content": user}]}).encode(),
             headers={"Content-Type": "application/json", "x-api-key": key,
                      "anthropic-version": "2023-06-01"})
-        r = json.load(urllib.request.urlopen(req, timeout=300))
+        r = json.load(zconfig.urlopen_auto(req, timeout=300))
         return "".join(c.get("text", "") for c in r.get("content", []) if c.get("type") == "text")
     req = urllib.request.Request(base + "/chat/completions",
         data=json.dumps({"model": model, "temperature": 0.4,
                          "messages": [{"role": "system", "content": system},
                                       {"role": "user", "content": user}]}).encode(),
         headers={"Content-Type": "application/json", "Authorization": "Bearer " + key})
-    r = json.load(urllib.request.urlopen(req, timeout=300))
+    r = json.load(zconfig.urlopen_auto(req, timeout=300))
     return r["choices"][0]["message"]["content"]
 
 
