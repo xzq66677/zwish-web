@@ -61,6 +61,8 @@
   .btn:hover{border-color:var(--acc); color:var(--acc)}
   .btn.primary{background:var(--acc); border-color:var(--acc); color:#fff; font-weight:600}
   .btn.primary:hover{background:#B5573A; color:#fff}
+  .btn.link{border-color:transparent; background:transparent; color:var(--dim); padding:10px 8px; font-size:13px}
+  .btn.link:hover{color:var(--acc); text-decoration:underline}
   .progress{background:var(--bg); border:1px solid var(--line); border-radius:12px; padding:14px 16px; margin:10px 0; font-size:13px; color:var(--dim)}
   .bar{height:6px; background:#E8E4D9; border-radius:4px; overflow:hidden; margin-top:10px}
   .bar i{display:block; height:100%; width:0%; background:linear-gradient(90deg,var(--acc),#E0A075); border-radius:4px; transition:width .4s}
@@ -402,7 +404,7 @@ async function composePrompt(){
 }
 
 /* ── 提示词卡片 ── */
-function renderPromptCard(note, refiner){
+function renderPromptCard(note, refiner, opts){
   if (refiner) S.refiner = refiner;
   const html = note ? `<span class="note">✓ ${esc(note)}</span>` : "";
   const en = S.prompt || "";
@@ -415,19 +417,20 @@ function renderPromptCard(note, refiner){
       ${cn ? `<div class="cn-note">💬 ${esc(cn)}</div>` : ""}
     </div>
     <div class="actions">
-      <button class="btn primary" onclick="generate()">🚀 开始生成</button>
-      <button class="btn" onclick="setStage('confirm','💬 交流修改：说出建议，向导会重写完整提示词…');inp.focus()">💬 交流修改</button>
-      <button class="btn" onclick="editPrompt()">✍️ 手动改英文词</button>
+      <button class="btn primary" onclick="setStage('confirm','💬 交流修改：说出建议，向导会重写完整提示词…');inp.focus()">💬 交流修改</button>
+      <button class="btn" onclick="generate()">🚀 开始生成</button>
+      <button class="btn link" onclick="editPrompt()">✍️ 手动改英文词</button>
     </div>`);
   setStage("confirm", "💬 交流修改：说出建议，向导会重写完整提示词…");
   S.promptCard = div;
+  if (!(opts && opts.noFocus)) setTimeout(()=>{ try{ inp.focus(); }catch(e){} }, 60);
 }
 function editPrompt(){
   const t = $("ptxt");
   t.contentEditable = true; t.focus();
   t.onblur = () => { t.contentEditable = false;
     if (t.textContent.trim() && t.textContent.trim() !== S.prompt){
-      S.prompt = t.textContent.trim(); renderPromptCard("已手动更新英文生图词");
+      S.prompt = t.textContent.trim(); renderPromptCard("已手动更新英文生图词", null, {noFocus:true});
     }};
 }
 
