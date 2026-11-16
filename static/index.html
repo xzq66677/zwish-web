@@ -302,11 +302,11 @@
 const S = { model:"auto", stage:"wish", wish:"", qa:"", answers:[], questions:[], sel:[],
             prompt:null, promptCn:null, w:1024, h:1024, lastImg:null, attach:null, hist:[], seed:null,
             params:{ w:1024, h:1024, den:0.55, denLock:false, steps:8, grow:12, threshold:0.5, seed:null, batch:1 },
-            provs:[], cloudSel:null, dsWebOk:false, dsWebMsg:"", visionModel:"gemma4-cc", comfyPort:8188,
+            provs:[], cloudSel:null, dsWebOk:false, dsWebMsg:"", visionModel:"gemma3:4b", comfyPort:8188,
             askCfg:null, askCount:2, askMode:"follow" };
 const $ = id => document.getElementById(id);
 const chat = $("chat"), inp = $("inp");
-function zwishVision(){ return S.visionModel || "gemma4-cc"; }
+function zwishVision(){ return S.visionModel || "gemma3:4b"; }
 
 function modelParam(){
   if (S.model === "fine") return "__local_fine__";
