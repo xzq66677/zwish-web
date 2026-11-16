@@ -29,7 +29,7 @@ _DEFAULTS = {
     "refiner_keyword": "abliterated",   # auto 模式下扫描 ollama list 的关键词（自由模式模型）
     "fallback_refiner": "qwen3:8b",
     "fine_model": "qwen3:8b",           # 精细润色·本地模型
-    "vision_model": "gemma4-cc",        # 看图点评用的多模态模型
+    "vision_model": "gemma3:4b",        # 看图点评用的多模态模型（与 install.py 拉取的一致）
     "models": {
         "unet": "z_image_turbo_int8_convrot.safetensors",
         "clip": "qwen_3_4b_fp8_mixed.safetensors",
