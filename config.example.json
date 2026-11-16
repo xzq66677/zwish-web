@@ -1,0 +1,45 @@
+{
+  "_说明": "复制本文件为 config.json 后按需修改。config.json 已被 gitignore，不会上传。",
+  "_base_dir说明": "指向包含 ComfyUI_windows_portable 文件夹的那一层目录。Windows 路径用正斜杠或双反斜杠。",
+
+  "base_dir": "E:/ComfyUI",
+  "port": 8189,
+  "comfy_port": 8188,
+
+  "ollama": "http://127.0.0.1:11434",
+
+  "_润色模型说明": "refiner=auto 时按 refiner_keyword 扫描本地模型（默认找 abliterated 自由模式模型）；也可直接填具体模型名。",
+  "refiner": "auto",
+  "refiner_keyword": "abliterated",
+  "fallback_refiner": "qwen3:8b",
+  "fine_model": "qwen3:8b",
+  "vision_model": "gemma4-cc",
+
+  "models": {
+    "unet": "z_image_turbo_int8_convrot.safetensors",
+    "clip": "qwen_3_4b_fp8_mixed.safetensors",
+    "vae": "ae.safetensors",
+    "sam_ckpt": "sam3.1_multiplex_fp16.safetensors"
+  },
+
+  "_追问次数说明": "本地模型上下文窗口有限，推荐少问；云端/DS 上下文大可多问。前端默认「跟随模型」按下面推荐值自动取，用户也可在侧栏手动选 1-max。wish=许愿追问默认数，edit=修图追问默认数。",
+  "ask_count": {
+    "wish": 3,
+    "edit": 2,
+    "min": 1,
+    "max": 8,
+    "local_recommend": 2,
+    "cloud_recommend": 4
+  },
+
+  "_DS网页说明": "「DS · 网页」通道用 Playwright 自动化 deepseek.com。headless=false 首次会打开浏览器让你登录，登录态存 data/ds_profile。网页改版导致找不到输入框/回复时，调整下面的选择器。",
+  "_ds_web_browser说明": "用哪个浏览器。auto=优先本机 Chrome/Edge（推荐，无需下载 chromium），找不到才用 Playwright 自带；也可填 chrome / msedge / chromium / 自定义 exe 绝对路径。",
+  "ds_web_browser": "auto",
+  "ds_web_chat_url": "https://chat.deepseek.com/",
+  "ds_web_headless": false,
+  "ds_web_selectors": {
+    "composer": ["textarea#chat-input", "textarea[placeholder]", "[contenteditable=\"true\"]", "textarea"],
+    "answer": [".ds-markdown", "[class*=\"assistant\"] [class*=\"markdown\"]", "[class*=\"message\"] pre", "[class*=\"assistant\"]"],
+    "generating": ["button:has-text(\"停止\")", "[class*=\"stop\"]", "button[aria-label*=\"停止\"]"]
+  }
+}
