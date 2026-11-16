@@ -1,0 +1,15 @@
+{
+  "_说明": "复制本文件为 providers.json 后填入你的 API Key。providers.json 已被 gitignore，含密钥绝不入库。",
+  "_用途": "「DS · API」和「☁️ 云端」通道读取本文件。也可用网页 ⚙️ 设置面板添加/测试供应商，保存后写入 providers.json。",
+  "_DS_API说明": "DeepSeek 官方 API 兼容 OpenAI 格式：base 填 https://api.deepseek.com，模型 deepseek-chat（普通）或 deepseek-reasoner（推理）。",
+  "providers": [
+    {
+      "name": "DeepSeek",
+      "base": "https://api.deepseek.com",
+      "format": "openai",
+      "key": "sk-在这里填你的DeepSeek密钥",
+      "models": ["deepseek-chat", "deepseek-reasoner"],
+      "on": true
+    }
+  ]
+}
