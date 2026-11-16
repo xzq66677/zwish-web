@@ -326,11 +326,27 @@ class _Browser:
         req = urllib.request.Request(
             f"http://127.0.0.1:{self.port}/json/new?{target}", method="PUT")
         tab = json.loads(zconfig.urlopen_local(req, timeout=15).read())
+        self.target_id = tab.get("id")
         self.ws = _WS(tab["webSocketDebuggerUrl"], timeout=30)
         self.ws.call("Page.enable")
         self.ws.call("Runtime.enable")
         self.ws.call("Runtime.evaluate", {"expression": JS_HELPER})
         return self.ws
+
+    def close_tab(self, target_id=None):
+        """关闭单个标签页（不杀浏览器进程），供复用模式清理会话。"""
+        tid = target_id or getattr(self, "target_id", None)
+        if not tid:
+            return
+        try:
+            zconfig.urlopen_local(
+                f"http://127.0.0.1:{self.port}/json/close/{tid}", timeout=5).read()
+        except Exception:
+            pass
+
+    def alive(self):
+        """浏览器进程是否仍在运行（供复用判断）。"""
+        return self.proc is not None and self.proc.poll() is None
 
     def _kill(self):
         try:
@@ -353,6 +369,34 @@ class _Browser:
         except Exception:
             pass
         self._kill()
+
+
+# ── 浏览器常驻复用：一次进程内只启动一次，多次对话复用同一实例 ──
+_BROWSER_SINGLETON = None
+
+
+def get_browser():
+    """获取常驻浏览器；进程已死则自动重建。
+
+    登录态保存在 data/ds_profile（独立 profile，与日常浏览器隔离），
+    首次在该弹出的窗口里登录一次后，后续调用自动复用，无需重复登录。
+    """
+    global _BROWSER_SINGLETON
+    if _BROWSER_SINGLETON is None or not _BROWSER_SINGLETON.alive():
+        _BROWSER_SINGLETON = _Browser()
+    return _BROWSER_SINGLETON
+
+
+def shutdown_browser():
+    """退出时清理常驻浏览器进程。"""
+    global _BROWSER_SINGLETON
+    if _BROWSER_SINGLETON is not None:
+        _BROWSER_SINGLETON.close()
+        _BROWSER_SINGLETON = None
+
+
+import atexit as _atexit
+_atexit.register(shutdown_browser)
 
 
 def _eval(ws, expr, timeout=30):
@@ -390,22 +434,38 @@ def web_chat(system, user, timeout=240):
     sends = json.dumps(_SEND_SELS, ensure_ascii=False)
     url = CFG.get("ds_web_chat_url") or "https://chat.deepseek.com/"
 
-    browser = _Browser()
+    browser = get_browser()
     try:
         ws = browser.new_tab(url)
         # 页面加载（含 redirect）
         time.sleep(2)
 
         # 等待登录：以出现输入框为准。首次需用户在弹出的浏览器里登录。
+        # 快速失败：宽限期后若检测到停在登录页，立即给出明确指引，不傻等满超时。
         login_deadline = time.time() + timeout
+        login_grace = time.time() + 15  # 给页面加载留 15s，避免慢网误判
         while time.time() < login_deadline:
             if _eval(ws, f"!!window.__zfind({composers})"):
                 break
+            if time.time() > login_grace:
+                on_login = _eval(ws, """(function(){
+                  var t=(document.body&&document.body.innerText)||'';
+                  t=t.toLowerCase();
+                  return t.indexOf('登录')>=0 || t.indexOf('登 录')>=0 ||
+                         t.indexOf('log in')>=0 || t.indexOf('sign in')>=0;
+                })()""")
+                if on_login:
+                    raise RuntimeError(
+                        "检测到 DeepSeek 未登录。请注意：本通道使用独立的浏览器配置"
+                        "（data/ds_profile），与你日常使用的浏览器登录态互不相通——"
+                        "请在程序弹出的那个新浏览器窗口里登录一次，之后自动复用。")
             time.sleep(1)
         else:
             raise RuntimeError(
-                f"等待 DeepSeek 网页登录/加载超时（{timeout}s）。首次使用请在弹出的浏览器里完成登录；"
-                "登录态会保存在 data/ds_profile，之后自动复用。")
+                f"等待 DeepSeek 网页登录/加载超时（{timeout}s）。注意：本通道使用独立的浏览器"
+                "配置（data/ds_profile），请在程序弹出的那个新浏览器窗口里完成登录（不是你"
+                "日常使用的浏览器）；登录后自动复用。若已登录仍超时，可能是网页改版，"
+                "请更新 config.json 的 ds_web_selectors.composer。")
 
         # 填入文本：用原生 setter 触发 React/Vue 的 input 事件
         fill = f"""(function(){{
@@ -481,7 +541,17 @@ def web_chat(system, user, timeout=240):
             raise RuntimeError("未读取到新的 DeepSeek 回复，可能网页结构变化或会话异常，请重试一次")
         return last_text
     finally:
-        browser.close()
+        # 常驻复用：只断开本会话的 WebSocket 并关闭本次标签页，浏览器进程保留，
+        # 下次调用直接复用（登录态与进程都不重建）。进程整体退出时由 atexit 清理。
+        try:
+            if ws:
+                ws.close()
+        except Exception:
+            pass
+        try:
+            browser.close_tab()
+        except Exception:
+            pass
 
 
 if __name__ == "__main__":

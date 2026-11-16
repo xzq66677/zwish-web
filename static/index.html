@@ -341,11 +341,23 @@ function addWizard(html, tag){
 }
 function addErr(t){ addWizard(`<span class="err">⚠ ${esc(t)}</span>`); }
 async function api(path, body){
-  const r = await fetch(path, body ? {method:"POST", headers:{"Content-Type":"application/json"},
-                                     body: JSON.stringify(body)} : undefined);
-  const j = await r.json();
-  if (j.error) throw new Error(j.error);
-  return j;
+  // 请求超时保护：避免后端长时间无响应时前端无限转圈（如 DS·网页通道等待登录）
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 180000);
+  try{
+    const r = await fetch(path, body ? {method:"POST", headers:{"Content-Type":"application/json"},
+                                     body: JSON.stringify(body), signal: ctrl.signal}
+                                  : {signal: ctrl.signal});
+    const j = await r.json();
+    if (j.error) throw new Error(j.error);
+    return j;
+  }catch(e){
+    if (e.name === "AbortError")
+      throw new Error("请求超时（180s）。若使用 DS·网页通道，请在程序弹出的新浏览器窗口里完成登录后重试；也可切换到 DS·API 或本地通道。");
+    throw e;
+  }finally{
+    clearTimeout(timer);
+  }
 }
 
 function setStage(st, placeholder){
