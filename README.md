@@ -227,6 +227,37 @@ python zimg.py --img photo.png --segment "cat" "a white kitten in a spacesuit"
 
 ---
 
+### 2026-11-17 · DS·网页通道体验优化与真实环境回归修复
+
+其中 #9/#10 来自真机实测发现的真实回归，本轮改动全部带回归测试（`test_ds_web_reuse.py` 14 项、`test_ui_prompt_actions.py` 10 项、`test_ds_web_realenv.py` 20 项）。
+
+**#6 — 未登录时卡「正在理解你的愿望…」240 秒，且每次请求重启浏览器**
+
+- **现象**：DS·网页通道未登录时，自动化脚本一直等不到回复，前端无超时提示；且每次调用都冷启动浏览器，重复登录态加载，单次请求可达数分钟。
+- **修复**（`zds.py` / `static/index.html`）：① 检测到未登录状态约 15 秒内快速失败并提示；② Chrome 实例常驻复用，会话结束不关闭浏览器；③ 前端 `api()` 加 AbortController 180 秒超时兜底。
+- **回归**：`tests/test_ds_web_reuse.py`。
+
+**#5 — 「💬 交流修改」提升为主操作**
+
+- **说明**：多数用户拿到润色结果后的第一反应是"用中文说哪里要改"，而非先翻译成英文。将「交流修改」提升为卡片主按钮，「开始生成」次之，「手动改英文词」降级为文字链接；点击输入框自动聚焦，轮播图场景可用 `noFocus` 关闭。
+
+**#9/#10 — 真机实测发现的三个并发与页面结构回归**
+
+- **现象 1（helper 失效）**：CDP 注入的 `window.__zfind` 助手函数在客户端导航（如登录跳转）后随 JS 上下文重建而丢失，登录检测在旧引用上空转，请求挂满 240 秒。
+- **现象 2（发送控件）**：DeepSeek 网页的发送按钮是 `div[role="button"]` 而非原生 `<button>`，且 React 受控组件对合成 `KeyboardEvent` 回车不响应，消息实际未发出。
+- **现象 3（并发串线）**：多个并发请求共享同一个 `target_id` / WebSocket，先结束的请求会关掉后请求正在使用的标签，造成误关与标签泄漏。
+- **修复**（`zds.py`）：① 每次 `Runtime.evaluate` 都把 helper 源码与表达式拼在同一次求值里，天然免疫导航丢失；② `_SEND_SELS` 补充 `div[role="button"]`（含"发送"文案 / aria-label / aria-disabled 变体），并新增兜底遍历输入框 4 层父级内的所有可点击节点；③ 会话改用独立的浏览器单例锁 + 会话锁两把锁——`ThreadingHTTPServer` 下的并发请求按会话串行执行，标签随会话在 `finally` 中显式清理，不再泄漏。
+- **回归**：`tests/test_ds_web_realenv.py`（含 8 线程并发单例与标签无泄漏断言）。
+
+> 运行全部回归：
+> ```bash
+> python tests/test_ds_web_reuse.py
+> python tests/test_ui_prompt_actions.py
+> python tests/test_ds_web_realenv.py
+> ```
+
+---
+
 ## 免责声明与使用规范
 
 ### 作者免责
