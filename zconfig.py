@@ -60,6 +60,20 @@ _DEFAULTS = {
         "generating": ['button:has-text("停止")', '[class*="stop"]',
                        'button[aria-label*="停止"]'],
     },
+    # ── 腾讯元宝网页自动化（本机实验备用通道，见上游 issue #14）────────
+    # 与 DS·网页完全隔离：独立 profile、独立选择器，首次需登录一次。
+    "yuanbao_web_browser": "auto",
+    "yuanbao_web_chat_url": "https://yuanbao.tencent.com/",
+    "yuanbao_web_headless": False,      # 首次登录需要 False（看得见浏览器）
+    "yuanbao_web_selectors": {          # 2026-11-17 真实页面结构；改版时在此调整
+        "composer": ['div.ql-editor[contenteditable="true"]',
+                     '[contenteditable="true"]'],
+        "send": ['div[aria-label="发送"]', '[aria-label*="发送"]',
+                 'button:has-text("发送")'],
+        "answer": ['.hyc-content-md', '[class*="hyc-content"]',
+                   '[class*="markdown"]'],
+        "generating": [],
+    },
 }
 
 # 内置 DeepSeek API 预置（settings 里「一键预置」写入 providers.json）
@@ -132,6 +146,7 @@ def load():
     cfg.setdefault("comfyui_main", os.path.join(root, "ComfyUI_windows_portable", "ComfyUI", "main.py"))
     cfg.setdefault("comfyui_python", os.path.join(root, "ComfyUI_windows_portable", "python_embeded", "python.exe"))
     cfg.setdefault("ds_profile_dir", os.path.join(cfg["data_dir"], "ds_profile"))
+    cfg.setdefault("yuanbao_profile_dir", os.path.join(cfg["data_dir"], "yuanbao_profile"))
 
     for key in ("data_dir", "uploads_dir"):
         try:

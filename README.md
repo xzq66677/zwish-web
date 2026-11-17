@@ -34,6 +34,7 @@
   | 精细润色     | 本地 `qwen3:8b`，润色更细腻、更有导演感                           | 否            |
   | DS · API | DeepSeek 官方 API，**内置提示词**                           | 是（需 API Key） |
   | DS · 网页  | CDP 控制本机浏览器访问 `chat.deepseek.com`，**零额外依赖 + 内置提示词** | 是（需登录一次）     |
+  | 元宝 · 网页 | CDP 控制本机浏览器访问 `yuanbao.tencent.com`，**独立 profile + 内置提示词**（备用通道） | 是（需登录一次）     |
   | ☁️ 云端    | 设置面板里任意 OpenAI/Anthropic 兼容供应商                      | 是            |
 - **生图三模式**：文生图 / img2img 整图改 / SAM 3 自动蒙版局部重绘
 - **看图点评**：本地视觉模型看着图给建议，一键应用
@@ -142,6 +143,20 @@ python zimg.py --img photo.png --segment "cat" "a white kitten in a spacesuit"
 ### ☁️ 云端（通用）
 
 设置面板可添加任意 OpenAI 兼容（`/chat/completions`）或 Anthropic（`/v1/messages`）供应商，支持多个、启停切换、一键测连接。顶部选「☁️ 云端」并在下拉框选模型。
+
+### 元宝 · 网页（备用通道，无需 API Key）
+
+DeepSeek 网页额度用尽时，可手动切换到腾讯元宝网页通道（Issue #14）。这是一条**备用**通道，不自动轮换账号、不绕过任何平台限额或登录要求。
+
+1. 确保本机已装 Chrome / Edge（与 DS·网页共用同一套 CDP 基础设施，零额外依赖）。
+2. 顶部选「元宝 · 网页」。首次使用会弹出浏览器，请在**程序弹出的窗口**里用微信扫码 / 手机 / QQ 登录一次。
+   - 该窗口使用独立配置目录 `data/yuanbao_profile`，与 `data/ds_profile` 和你的日常浏览器**完全隔离**。
+   - 也可先手动打开登录窗口：`POST /api/yuanbao_login`。
+3. 登录态保存在 `data/yuanbao_profile/`（已 gitignore），之后自动复用；浏览器进程常驻。
+4. 文字提示词会发送到腾讯元宝；**图片与看图点评仍走本地视觉模型，不上传**。
+5. 元宝网页改版导致定位失败时，在 `config.json` 的 `yuanbao_web_selectors` 更新 `composer` / `send` / `answer` 即可，无需改代码。
+
+> 与 DS·网页共用 `zds._WEB_LOCK`，两条网页通道串行执行，不会同时操作同一个浏览器。使用前请自行确认腾讯元宝的数据政策与使用条款。
 
 ### 自定义内置提示词（DS 网页 / API / 云端共用）
 

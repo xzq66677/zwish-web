@@ -165,12 +165,20 @@ def llm_ds_web(system, user):
     return text, "DeepSeek/网页"
 
 
+def llm_yuanbao_web(system, user):
+    """腾讯元宝网页自动化通道（本机实验备用，独立 profile，首次需登录一次）。"""
+    import zyuanbao
+    text = zyuanbao.web_chat(system, user)
+    return text, "腾讯元宝/网页"
+
+
 def llm_call(model, system, user):
     """统一入口：返回 (文本, 实际模型名)。
 
     model:
       __ds_api__  → DeepSeek API
       __ds_web__  → DeepSeek 网页自动化
+      __yuanbao_web__ → 腾讯元宝网页自动化（本机实验备用）
       __local_fine__ → 本地精细润色模型
       __cloud__[:sel]  → 通用云端
       其他/None → 本地自由模式模型
@@ -179,6 +187,8 @@ def llm_call(model, system, user):
         return llm_ds_api(system, user)
     if model == "__ds_web__":
         return llm_ds_web(system, user)
+    if model == "__yuanbao_web__":
+        return llm_yuanbao_web(system, user)
     if model == "__local_fine__":
         m = FINE_MODEL
         return llm_json(m, system, user), m
