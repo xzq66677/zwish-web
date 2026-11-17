@@ -237,7 +237,13 @@ python zimg.py --img photo.png --segment "cat" "a white kitten in a spacesuit"
 - **🟡 缓存无界增长**（`server.py`）：`JOBS` 只增不删（长驻内存泄漏）、`DESCRIBE_CACHE` 无上限。现在 `start_job` 仅保留最近 50 个已结束任务，描述缓存上限 200 条、淘汰最早写入。
 - **🟡 前后端超时错配**（`zds.py`）：前端 180s 放弃后，后端最坏还要跑 240+240s，占用浏览器且用户重试会叠加请求。现在 `web_chat` 默认 `timeout=150`、登录阶段封顶 30s，最坏总耗时 ≈180s，与前端对齐。
 - **💭 loopback 误判**（`zconfig.py`）：`host.startswith("127.")` 会把 `http://127.0.0.1.evil.com/` 判为本机而绕过代理。改用 `ipaddress.ip_address(host).is_loopback` 精确判断，域名字符串一律不视为本机。
-- **审查未采纳/留待后续**：API Key 明文回传与 Origin/Host 校验（涉及设置面板协议变更，单独拆 Issue）；`except` 静默吞错、`/api/upload` 体积上限、接入 pytest/CI。
+- **审查遗留项已全部落地（同日第二轮后续）**：
+  - **API Key 脱敏 + 来源校验**（`server.py` / `static/index.html`）：`/api/config`、`/api/providers` 不再把 key 明文回传浏览器，只回 `has_key` 标志；设置面板 key 输入框显示"已配置（留空保持不变）"，保存时 key 留空=沿用旧 key（`_merge_provider_keys` 回填）。所有请求校验 Host 头（拦 DNS rebinding），POST 请求校验 Origin（拦外部页面跨源篡改配置/触发删除）。`/api/test_provider` 按 名称 回填真实 key 后再测试。
+  - **上传校验**：`/api/upload` 限 25MB + PNG/JPEG/WEBP/GIF 魔数校验。
+  - **报错可见**：`load_providers()` 解析失败不再静默返回空列表，打印警告到 stderr。
+  - **统一测试入口**：`python tests/run_all.py` 一键跑全量（当前 8 个文件、101 项断言）。
+  - 回归：`tests/test_security_fixes.py`（21 项）。
+- **审查未采纳/留待后续**：Windows 真机验证「ComfyUI 未启动时生成」不卡 900s（见 Issue #12）。
 
 > 运行本轮回归：
 > ```bash

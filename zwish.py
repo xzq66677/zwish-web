@@ -88,7 +88,10 @@ def load_providers():
                           "models": [c.get("model", "")], "on": True}]
         else:
             PROVIDERS = []
-    except Exception:
+    except Exception as e:
+        # 解析失败不再静默返回空列表——至少让用户在服务日志里看到原因
+        print(f"[zwish] 警告：providers.json 解析失败（{e}），云端供应商列表不可用，"
+              f"请检查 {PROV_FILE} 是否为合法 JSON", file=sys.stderr)
         PROVIDERS = []
     return PROVIDERS
 

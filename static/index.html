@@ -950,7 +950,7 @@ function renderSettings(){
           <option value="anthropic" ${p.format==="anthropic"?"selected":""}>Anthropic (/v1/messages)</option>
         </select></div>
       <div class="prow"><label>API Key</label>
-        <input type="password" data-f="key" data-i="${i}" value="${esc(p.key||"")}"></div>
+        <input type="password" data-f="key" data-i="${i}" value="" placeholder="${p.has_key ? "已配置（留空保持不变）" : "未配置，请输入 API Key"}"></div>
       <div class="prow"><label>模型列表</label>
         <input data-f="models" data-i="${i}" value="${esc((p.models||[]).join(", "))}" placeholder="model-a, model-b（逗号分隔）"></div>
       <div class="prow"><span class="mini" style="width:auto" onclick="testProv(${i})">🧪 测试连接</span>

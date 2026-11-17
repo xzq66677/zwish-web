@@ -29,6 +29,65 @@ DESCRIBE_CACHE = {}  # {path:mtime -> vision 描述}，避免每轮微调重复�
 
 _JOBS_KEEP = 50          # 保留最近 N 个已结束任务，防止长驻运行内存无界增长
 _DESCRIBE_LIMIT = 200    # 看图描述缓存上限
+_UPLOAD_MAX = 25 * 1024 * 1024  # 上传图片体积上限 25MB
+
+
+def _looks_like_image(raw):
+    """魔数校验：是否为 PNG / JPEG / WEBP / GIF。"""
+    if not raw or len(raw) < 12:
+        return False
+    if raw[:8] == b"\x89PNG\r\n\x1a\n":
+        return True
+    if raw[:3] == b"\xff\xd8\xff":
+        return True
+    if raw[:4] == b"RIFF" and raw[8:12] == b"WEBP":
+        return True
+    if raw[:4] in (b"GIF8",):
+        return True
+    return False
+
+
+def _is_loopback_host(h):
+    """Host/Origin 的主机名是否为本机回环（ipaddress 精确判断，域名字符串不误判）。"""
+    h = (h or "").strip("[]").lower()
+    if h == "localhost":
+        return True
+    import ipaddress
+    try:
+        return ipaddress.ip_address(h).is_loopback
+    except ValueError:
+        return False
+
+
+def _mask_providers(ps):
+    """API Key 脱敏：只回 has_key 标志，不把 key 明文发给浏览器。
+
+    设置面板保存时 key 留空表示"保持不变"，由 _merge_provider_keys 回填。
+    """
+    out = []
+    for p in ps or []:
+        q = dict(p)
+        q["has_key"] = bool(p.get("key"))
+        q["key"] = ""
+        out.append(q)
+    return out
+
+
+def _merge_provider_keys(incoming):
+    """保存供应商时回填被脱敏遮掉的 key：key 为空且原名已有 key → 沿用旧 key。
+
+    （如需清除 key，删除该供应商后重建即可。）
+    """
+    old = {}
+    for p in (zwish.PROVIDERS or zwish.load_providers()):
+        old[p.get("name")] = p
+    out = []
+    for p in incoming or []:
+        p = dict(p)
+        if not p.get("key") and p.get("name") in old:
+            p["key"] = old[p["name"]].get("key", "")
+        out.append(p)
+    return out
 
 
 def _write_history_lines(lines):
@@ -145,8 +204,26 @@ class H(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(data)
 
+    def _same_origin(self, need_origin=False):
+        """本机服务安全边界（防 CSRF / DNS rebinding）。
+
+        - Host 头必须指向本机回环（拦 DNS rebinding：外部页面把域名解析到 127.0.0.1 再访问）；
+        - POST 请求若带 Origin（浏览器对跨源 POST 一定带），其主机必须也是本机回环。
+        """
+        host = (self.headers.get("Host") or "").rsplit(":", 1)[0]
+        if host and not _is_loopback_host(host):
+            return False
+        origin = self.headers.get("Origin")
+        if origin:
+            ohost = urlparse(origin).hostname or ""
+            if not _is_loopback_host(ohost):
+                return False
+        return True
+
     def do_GET(self):
         path = urlparse(self.path).path
+        if not self._same_origin():
+            return self._json({"error": "请求来源不是本机，已被拒绝"}, 403)
         if path in ("/", "/index.html"):
             return self._file(os.path.join(STATIC, "index.html"), "text/html; charset=utf-8")
         if path.startswith("/assets/"):
@@ -169,7 +246,7 @@ class H(BaseHTTPRequestHandler):
             return self._json({
                 "cloud": bool(ps), "vision_model": zwish.VISION,
                 "comfy_port": CFG.get("comfy_port", 8188),
-                "providers": zwish.PROVIDERS or zwish.load_providers(),
+                "providers": _mask_providers(zwish.PROVIDERS or zwish.load_providers()),
                 "ds_web": {"ok": ds_web_ok, "msg": ds_web_msg},
                 "ask_count": CFG.get("ask_count", {}),
                 "ready": CFG.get("ready", False),
@@ -178,7 +255,7 @@ class H(BaseHTTPRequestHandler):
             import zprompts
             return self._json(zprompts.state())
         if path == "/api/providers":
-            return self._json({"providers": zwish.PROVIDERS or zwish.load_providers()})
+            return self._json({"providers": _mask_providers(zwish.PROVIDERS or zwish.load_providers())})
         if path == "/api/history":
             recs = []
             if os.path.isfile(HIST):
@@ -198,10 +275,16 @@ class H(BaseHTTPRequestHandler):
 
     def do_POST(self):
         path = urlparse(self.path).path
+        if not self._same_origin():
+            return self._json({"error": "请求来源不是本机，已被拒绝（防跨源篡改配置）"}, 403)
         try:
             if path == "/api/upload":
                 n = int(self.headers.get("content-length", 0))
+                if n <= 0 or n > _UPLOAD_MAX:
+                    return self._json({"error": f"图片体积超出上限（{_UPLOAD_MAX // (1024*1024)}MB）"}, 413)
                 raw = self.rfile.read(n)
+                if not _looks_like_image(raw):
+                    return self._json({"error": "不是受支持的图片格式（仅 PNG / JPEG / WEBP / GIF）"}, 400)
                 base = re.sub(r"[^A-Za-z0-9_.-]", "_", self.headers.get("X-Filename", "img.png"))
                 fp = os.path.join(UPLOADS, f"{int(time.time())}_{base}")
                 with open(fp, "wb") as f:
@@ -219,14 +302,20 @@ class H(BaseHTTPRequestHandler):
             # ── 供应商管理 ──
             if path == "/api/test_provider":
                 p = b.get("provider") or {}
+                if not p.get("key"):
+                    # key 已脱敏遮蔽：按名称回填存储中的真实 key 再测试
+                    for old in (zwish.PROVIDERS or zwish.load_providers()):
+                        if old.get("name") == p.get("name") and old.get("key"):
+                            p = {**old, **{k: v for k, v in p.items() if k != "key"}}
+                            break
                 try:
                     r = zwish.test_provider(p)
                     return self._json(r)
                 except Exception as e:
                     return self._json({"ok": False, "error": str(e)})
             if path == "/api/save_providers":
-                zwish.save_providers(b.get("providers", []))
-                return self._json({"ok": True, "providers": zwish.PROVIDERS})
+                zwish.save_providers(_merge_provider_keys(b.get("providers", [])))
+                return self._json({"ok": True, "providers": _mask_providers(zwish.PROVIDERS)})
 
             # ── 内置提示词自定义（DS 网页 / API / 云端共用）──
             if path == "/api/save_prompts":
