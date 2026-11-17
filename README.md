@@ -242,6 +242,14 @@ DeepSeek 网页额度用尽时，可手动切换到腾讯元宝网页通道（Is
 
 ---
 
+### 2026-11-17 · 元宝网页备用通道与 Windows 测试入口修复
+
+**#14 / PR #16 — 新增「元宝 · 网页」备用通道**：DeepSeek 网页额度用尽时的手动备用通道（用户主动选择，不自动轮换账号、不绕过任何限额）。复用 `zds.py` 的 CDP 基础设施（浏览器探测 / WebSocket / helper 注入 / 两把锁），独立 `data/yuanbao_profile` 登录态与选择器；文字提示词发往腾讯元宝，图片与看图点评仍走本地。新增 `zyuanbao.py`、`/api/yuanbao_login`、前端标签与路由、`config.example.json` 配置项，回归 `tests/test_yuanbao_web.py`（25 项：profile 隔离、锁复用、会话清理、Quill 填充、发送状态、桩浏览器复用与无标签泄漏）。合并后已实证全仓 143/143 通过。
+
+**#15 — 统一测试入口在 Windows 默认控制台崩溃**：`tests/run_all.py` 原先打印 `▶` / `✓`，在 GBK(cp936) 控制台抛 `UnicodeEncodeError`。修复用三重保险：输出前缀改 ASCII（`>` / `[OK]`）、stdout/stderr 强制 UTF-8 + `errors=replace`、子进程固定 `PYTHONIOENCODING=utf-8`；并让入口跳过会反向调用自身的元测试以避免递归。回归 `tests/test_run_all_windows.py`（7 项，含 GBK 环境实证退出码 0）。
+
+---
+
 ### 2026-11-17 · 代码审查第二轮：并发之外的安全边界与健壮性
 
 针对外部审查发现的问题逐条修复（其中并发缺陷已在上一轮 PR #11 解决），本轮带回归 `tests/test_review_fixes.py`（24 项），全仓测试 90/90 通过。
