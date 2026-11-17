@@ -18,6 +18,7 @@ import socket
 import struct
 import subprocess
 import sys
+import threading
 import time
 import urllib.parse
 import urllib.request
@@ -31,7 +32,10 @@ PROFILE = CFG.get("ds_profile_dir") or os.path.join(zconfig.HERE, "data", "ds_pr
 _WS_GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 _SEND_SELS = ['button:has-text("发送")', '[data-testid="send-button"]',
               'button[aria-label*="发送"]', 'button[type="submit"]',
-              'button:has-text("Send")', 'button[aria-label*="Send"]']
+              'div[role="button"]:has-text("发送")', '[role="button"][aria-label*="发送"]',
+              '[data-testid="send-button"] div', 'div[role="button"][aria-disabled="false"]:has-text("发送")',
+              'button:has-text("Send")', 'button[aria-label*="Send"]',
+              '[role="button"][aria-label*="Send"]']
 
 # 注入到页面里的公共 JS：提供 window.__zfind(selectors)，
 # 兼容 Playwright 风格的后缀 :has-text("文字")（CDP 原生 CSS 不支持）。
@@ -322,25 +326,29 @@ class _Browser:
         self.ws = None
 
     def new_tab(self, url):
+        """新建标签页，返回 (ws, target_id)。
+
+        会话状态由调用方持有，不写入共享实例字段——浏览器进程虽常驻复用，
+        但 target_id/ws 属于单次会话，写回共享字段会让并发请求互相覆盖
+        （Issue #9：close_tab 读共享 target_id 会关错标签并泄漏会话）。
+        """
         target = urllib.parse.quote(url, safe=":/?=&%#")
         req = urllib.request.Request(
             f"http://127.0.0.1:{self.port}/json/new?{target}", method="PUT")
         tab = json.loads(zconfig.urlopen_local(req, timeout=15).read())
-        self.target_id = tab.get("id")
-        self.ws = _WS(tab["webSocketDebuggerUrl"], timeout=30)
-        self.ws.call("Page.enable")
-        self.ws.call("Runtime.enable")
-        self.ws.call("Runtime.evaluate", {"expression": JS_HELPER})
-        return self.ws
+        ws = _WS(tab["webSocketDebuggerUrl"], timeout=30)
+        ws.call("Page.enable")
+        ws.call("Runtime.enable")
+        ws.call("Runtime.evaluate", {"expression": JS_HELPER})
+        return ws, tab.get("id")
 
     def close_tab(self, target_id=None):
-        """关闭单个标签页（不杀浏览器进程），供复用模式清理会话。"""
-        tid = target_id or getattr(self, "target_id", None)
-        if not tid:
+        """关闭指定标签页（不杀浏览器进程），供复用模式清理会话。"""
+        if not target_id:
             return
         try:
             zconfig.urlopen_local(
-                f"http://127.0.0.1:{self.port}/json/close/{tid}", timeout=5).read()
+                f"http://127.0.0.1:{self.port}/json/close/{target_id}", timeout=5).read()
         except Exception:
             pass
 
@@ -356,11 +364,8 @@ class _Browser:
             pass
 
     def close(self):
-        try:
-            if self.ws:
-                self.ws.close()
-        except Exception:
-            pass
+        # self.ws 已随 #9 改为会话局部状态（不再挂在实例上），这里只关
+        # 浏览器级 WebSocket 与进程；会话 ws 由 web_chat 的 finally 自行关闭。
         try:
             if self.browser_ws:
                 w = _WS(self.browser_ws, timeout=5)
@@ -373,6 +378,11 @@ class _Browser:
 
 # ── 浏览器常驻复用：一次进程内只启动一次，多次对话复用同一实例 ──
 _BROWSER_SINGLETON = None
+# 两把锁职责不同，避免不可重入锁嵌套死锁（web_chat 持 _WEB_LOCK 时会调 get_browser）：
+#   _WEB_LOCK      —— 串行化整个网页会话（Issue #9）
+#   _BROWSER_LOCK  —— 仅保护单例的创建/替换
+_WEB_LOCK = threading.Lock()
+_BROWSER_LOCK = threading.Lock()
 
 
 def get_browser():
@@ -380,11 +390,15 @@ def get_browser():
 
     登录态保存在 data/ds_profile（独立 profile，与日常浏览器隔离），
     首次在该弹出的窗口里登录一次后，后续调用自动复用，无需重复登录。
+
+    加锁原因：ThreadingHTTPServer 下两个请求可能同时发现单例为 None，
+    各自 _Browser() 会拉起两个浏览器进程（竞态实测 8 线程创建 8 个）。
     """
     global _BROWSER_SINGLETON
-    if _BROWSER_SINGLETON is None or not _BROWSER_SINGLETON.alive():
-        _BROWSER_SINGLETON = _Browser()
-    return _BROWSER_SINGLETON
+    with _BROWSER_LOCK:
+        if _BROWSER_SINGLETON is None or not _BROWSER_SINGLETON.alive():
+            _BROWSER_SINGLETON = _Browser()
+        return _BROWSER_SINGLETON
 
 
 def shutdown_browser():
@@ -400,9 +414,14 @@ _atexit.register(shutdown_browser)
 
 
 def _eval(ws, expr, timeout=30):
+    # 每次求值都把 JS_HELPER 与目标表达式拼进同一次 evaluate：
+    # DeepSeek 的客户端导航会重建 JS 上下文，new_tab 时注入的 window.__zfind
+    # 会随导航消失（Issue #10）；helper 定义是幂等的（if (!window.__zfind)），
+    # 每次重注入代价极低，且不再依赖任何注入时机。
     try:
         r = ws.call("Runtime.evaluate",
-                    {"expression": expr, "returnByValue": True, "awaitPromise": True},
+                    {"expression": JS_HELPER + "\n" + expr,
+                     "returnByValue": True, "awaitPromise": True},
                     timeout=timeout)
     except Exception:
         return None
@@ -421,6 +440,13 @@ def web_chat(system, user, timeout=240):
     system 作为内置提示词随用户消息一起发送（网页端没有独立 system 输入，
     故拼在消息头部；与 API 通道 system/user 分离的效果等价）。
     """
+    # DS·网页是共享单浏览器的交互自动化，全程持锁串行化（Issue #9）：
+    # 并发请求只会排队等待，不会互相关闭标签或覆盖会话状态。
+    with _WEB_LOCK:
+        return _web_chat_locked(system, user, timeout)
+
+
+def _web_chat_locked(system, user, timeout):
     ok, msg = available()
     if not ok:
         raise RuntimeError(msg)
@@ -429,14 +455,18 @@ def web_chat(system, user, timeout=240):
     sels = CFG["ds_web_selectors"]
     composers = json.dumps(sels.get("composer", ["textarea"]), ensure_ascii=False)
     answers = json.dumps(sels.get("answer", [".ds-markdown"]), ensure_ascii=False)
-    generating = json.dumps(sels.get("generating", []) + ['button:has-text("停止生成")'],
+    generating = json.dumps(sels.get("generating", [])
+                            + ['button:has-text("停止生成")',
+                               'div[role="button"]:has-text("停止")',
+                               '[role="button"][aria-label*="停止"]'],
                             ensure_ascii=False)
     sends = json.dumps(_SEND_SELS, ensure_ascii=False)
     url = CFG.get("ds_web_chat_url") or "https://chat.deepseek.com/"
 
     browser = get_browser()
+    ws = target_id = None  # 会话状态局部持有（Issue #9），finally 显式传参
     try:
-        ws = browser.new_tab(url)
+        ws, target_id = browser.new_tab(url)
         # 页面加载（含 redirect）
         time.sleep(2)
 
@@ -495,7 +525,7 @@ def web_chat(system, user, timeout=240):
             var box = window.__zfind({composers});
             var p = box ? box.parentElement : null;
             for (var k=0; k<4 && p; k++) {{
-              var bs = p.querySelectorAll('button');
+              var bs = p.querySelectorAll('button,[role="button"]');
               if (bs.length) {{ btn = bs[bs.length-1]; break; }}
               p = p.parentElement;
             }}
@@ -541,15 +571,16 @@ def web_chat(system, user, timeout=240):
             raise RuntimeError("未读取到新的 DeepSeek 回复，可能网页结构变化或会话异常，请重试一次")
         return last_text
     finally:
-        # 常驻复用：只断开本会话的 WebSocket 并关闭本次标签页，浏览器进程保留，
-        # 下次调用直接复用（登录态与进程都不重建）。进程整体退出时由 atexit 清理。
+        # 常驻复用：只断开本会话的 WebSocket 并关闭本次标签页（显式传本次的
+        # target_id，不读共享状态），浏览器进程保留，下次调用直接复用。
+        # 进程整体退出时由 atexit 清理。
         try:
             if ws:
                 ws.close()
         except Exception:
             pass
         try:
-            browser.close_tab()
+            browser.close_tab(target_id)
         except Exception:
             pass
 
@@ -562,7 +593,7 @@ if __name__ == "__main__":
         try:
             b = _Browser()
             try:
-                ws = b.new_tab("data:text/html,<h1 id='zok'>CDP OK</h1>")
+                ws, tid = b.new_tab("data:text/html,<h1 id='zok'>CDP OK</h1>")
                 print("[zds] 页面读取：", _eval(ws, "document.getElementById('zok').textContent"))
             finally:
                 b.close()

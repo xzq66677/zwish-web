@@ -73,9 +73,13 @@ def main():
             pass  # 桩实例，无需清理
 
     # --- 3. web_chat 源码结构核对（AST，避免注释干扰）---
-    src = inspect.getsource(zds.web_chat)
+    # 注：web_chat 现为「持锁入口」，逻辑主体在 _web_chat_locked（#9 串行化）。
+    src = inspect.getsource(zds._web_chat_locked)
     tree = ast.parse(src)
     text = ast.unparse(tree)
+    entry = ast.unparse(ast.parse(inspect.getsource(zds.web_chat)))
+    check("web_chat 入口持 _WEB_LOCK 串行化",
+          "with _WEB_LOCK" in entry and "_web_chat_locked" in entry)
     check("web_chat 使用 get_browser（常驻复用）", "get_browser()" in text)
     check("web_chat 不再调用 _Browser() 直接新建", "_Browser()" not in text)
     check("web_chat finally 不再整体关闭浏览器",
