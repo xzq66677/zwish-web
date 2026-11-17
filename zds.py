@@ -434,7 +434,10 @@ def _js_str(s):
     return json.dumps(s, ensure_ascii=False)
 
 
-def web_chat(system, user, timeout=240):
+def web_chat(system, user, timeout=150):
+    # 默认 timeout=150：登录阶段另计最多 30s，最坏总耗时 ≈ 180s，
+    # 与前端 api() 的 AbortController 180s 超时预算对齐，避免前端先放弃
+    # 而后端线程仍在占用浏览器，用户重试时请求叠加。
     """在 DeepSeek 网页发起一次对话，返回助手回复文本。
 
     system 作为内置提示词随用户消息一起发送（网页端没有独立 system 输入，
@@ -472,7 +475,9 @@ def _web_chat_locked(system, user, timeout):
 
         # 等待登录：以出现输入框为准。首次需用户在弹出的浏览器里登录。
         # 快速失败：宽限期后若检测到停在登录页，立即给出明确指引，不傻等满超时。
-        login_deadline = time.time() + timeout
+        # 登录阶段预算封顶 30s（未登录 ~15s 即可判定），把超时预算留给回复等待，
+        # 使整个会话的最坏耗时 ≈ timeout + 30，与前端 180s 超时预算对齐。
+        login_deadline = time.time() + min(timeout, 30)
         login_grace = time.time() + 15  # 给页面加载留 15s，避免慢网误判
         while time.time() < login_deadline:
             if _eval(ws, f"!!window.__zfind({composers})"):

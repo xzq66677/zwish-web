@@ -227,6 +227,25 @@ python zimg.py --img photo.png --segment "cat" "a white kitten in a spacesuit"
 
 ---
 
+### 2026-11-17 · 代码审查第二轮：并发之外的安全边界与健壮性
+
+针对外部审查发现的问题逐条修复（其中并发缺陷已在上一轮 PR #11 解决），本轮带回归 `tests/test_review_fixes.py`（24 项），全仓测试 90/90 通过。
+
+- **🔴 esc() 属性逃逸**（`static/index.html`）：`esc()` 只转义 `& < >`，而它被用在 `data-o="..."`、`onclick="fn('${x}')"` 等属性上下文，LLM 返回的追问选项属不可信输入，`'" onmouseover=…'` 可逃逸属性。修复：`esc()` 补上 `"` → `&quot;`、`'` → `&#39;`，并把画廊 `showLb`/`src`、删除按钮 `delImage` 的参数改为走 `esc()`。
+- **🔴→已修 并发单例**：审查指出的 8 线程创建 8 个浏览器实例、误关他人标签等问题，上一轮已用 `_WEB_LOCK` + `_BROWSER_LOCK` 两把锁解决（见 2026-11-17 上一节），本轮回归 `test_ds_web_realenv.py` 覆盖。
+- **🟡 历史文件并发写**（`server.py`）：`/api/delete_history` 原先全量读 + `"w"` 覆盖写，与 `zimg` 子进程的追加写并发时会丢记录/读到半行 JSON。改为临时文件 + `os.replace` 原子替换，删除逻辑抽为 `_delete_history_entry()`。
+- **🟡 缓存无界增长**（`server.py`）：`JOBS` 只增不删（长驻内存泄漏）、`DESCRIBE_CACHE` 无上限。现在 `start_job` 仅保留最近 50 个已结束任务，描述缓存上限 200 条、淘汰最早写入。
+- **🟡 前后端超时错配**（`zds.py`）：前端 180s 放弃后，后端最坏还要跑 240+240s，占用浏览器且用户重试会叠加请求。现在 `web_chat` 默认 `timeout=150`、登录阶段封顶 30s，最坏总耗时 ≈180s，与前端对齐。
+- **💭 loopback 误判**（`zconfig.py`）：`host.startswith("127.")` 会把 `http://127.0.0.1.evil.com/` 判为本机而绕过代理。改用 `ipaddress.ip_address(host).is_loopback` 精确判断，域名字符串一律不视为本机。
+- **审查未采纳/留待后续**：API Key 明文回传与 Origin/Host 校验（涉及设置面板协议变更，单独拆 Issue）；`except` 静默吞错、`/api/upload` 体积上限、接入 pytest/CI。
+
+> 运行本轮回归：
+> ```bash
+> python tests/test_review_fixes.py
+> ```
+
+---
+
 ### 2026-11-17 · DS·网页通道体验优化与真实环境回归修复
 
 其中 #9/#10 来自真机实测发现的真实回归，本轮改动全部带回归测试（`test_ds_web_reuse.py` 14 项、`test_ui_prompt_actions.py` 10 项、`test_ds_web_realenv.py` 20 项）。

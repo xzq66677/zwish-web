@@ -331,7 +331,7 @@ function setModel(m){
   if (S.askCfg) renderAskBtns();   // 切换通道时刷新推荐问题数
 }
 function scrollEnd(){ chat.scrollTop = chat.scrollHeight; }
-function esc(s){ return (s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+function esc(s){ return (s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;"); }
 function addMe(t){ chat.insertAdjacentHTML("beforeend", `<div class="row me"><div class="bubble">${esc(t)}</div></div>`); scrollEnd(); }
 function addWizard(html, tag){
   const div = document.createElement("div");
@@ -494,7 +494,7 @@ async function generate(body){
             `<div class="imgcard"><img src="/assets/${j.image}" onclick="showLb('/assets/${j.image}')">
              <div class="imgbtns">
                <span class="mini" onclick="critique('/assets/${j.image}')">🔍 点评</span>
-               <span class="mini" onclick="delImage('${j.image}')">🗑 删除</span>
+               <span class="mini" onclick="delImage('${esc(j.image)}')">🗑 删除</span>
              </div></div>`);
           done = j; break;
         }
@@ -704,7 +704,7 @@ async function refreshGallery(){
   try{
     const r = await api("/api/gallery");
     $("gallery").innerHTML = r.images.map(i =>
-      `<div class="gwrap"><img src="${i.url}" onclick="showLb('${i.url}')">
+      `<div class="gwrap"><img src="${esc(i.url)}" onclick="showLb('${esc(i.url)}')">
        <span class="gdel" title="删除" onclick="event.stopPropagation(); delImage('${i.name}')">✕</span></div>`).join("");
   }catch(e){}
 }

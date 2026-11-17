@@ -165,13 +165,23 @@ def urlopen_local(url, data=None, timeout=None):
 
 
 def _is_loopback(url):
-    """判断请求的主机是否为本机回环地址（支持 str 或 urllib Request）。"""
+    """判断请求的主机是否为本机回环地址（支持 str 或 urllib Request）。
+
+    用 ipaddress 精确判断 127.0.0.0/8 与 ::1，而非字符串前缀——
+    否则 http://127.0.0.1.evil.com/ 之类域名会被误判为本机而绕过代理。
+    """
+    import ipaddress
     raw = getattr(url, "full_url", url)  # Request 对象取 full_url
     host = urllib.parse.urlparse(str(raw)).hostname
     if not host:
         return False
     host = host.strip("[]").lower()  # IPv6 形如 [::1]
-    return host in ("localhost", "::1") or host.startswith("127.")
+    if host == "localhost":
+        return True
+    try:
+        return ipaddress.ip_address(host).is_loopback
+    except ValueError:
+        return False  # 域名（含伪装成 127.x 的域名）一律不视为本机
 
 
 def urlopen_auto(url, data=None, timeout=None):

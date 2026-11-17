@@ -27,6 +27,49 @@ JOBS = {}
 LOCK = threading.Lock()
 DESCRIBE_CACHE = {}  # {path:mtime -> vision 描述}，避免每轮微调重复读图
 
+_JOBS_KEEP = 50          # 保留最近 N 个已结束任务，防止长驻运行内存无界增长
+_DESCRIBE_LIMIT = 200    # 看图描述缓存上限
+
+
+def _write_history_lines(lines):
+    """原子写历史文件：先写临时文件再 os.replace。
+
+    zimg 子进程以追加模式写同一文件；若直接 "w" 覆盖写，删除期间
+    恰好生成完一条新记录会被抹掉，读取方也可能读到半行 JSON。
+    os.replace 在同一文件系统上是原子的，可避免中间状态暴露。
+    """
+    tmp = HIST + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        f.write("".join(x + "\n" for x in lines if x))
+    os.replace(tmp, HIST)
+
+
+def _delete_history_entry(ts, image):
+    """从 history.jsonl 中删除一条记录（原子替换写回）。"""
+    if not os.path.isfile(HIST):
+        return
+    keep = []
+    with open(HIST, encoding="utf-8") as f:
+        for line in f:
+            skip = False
+            try:
+                r = json.loads(line)
+                if r.get("ts") == ts and r.get("image") == image:
+                    skip = True
+            except Exception:
+                skip = True
+            if not skip:
+                keep.append(line.rstrip("\n"))
+    _write_history_lines(keep)
+
+
+def _cache_desc(key, desc):
+    """写入看图描述缓存并做上限截断（淘汰最早写入的条目）。"""
+    DESCRIBE_CACHE[key] = desc
+    if len(DESCRIBE_CACHE) > _DESCRIBE_LIMIT:
+        for k in list(DESCRIBE_CACHE)[: len(DESCRIBE_CACHE) - _DESCRIBE_LIMIT]:
+            DESCRIBE_CACHE.pop(k, None)
+
 
 def run_job(job):
     job["status"] = "running"
@@ -68,6 +111,11 @@ def start_job(args):
     job = {"id": jid, "args": args, "status": "queued", "started": time.time()}
     with LOCK:
         JOBS[jid] = job
+        finished = [k for k, v in JOBS.items() if v.get("status") in ("done", "failed")]
+        if len(finished) > _JOBS_KEEP:
+            finished.sort(key=lambda k: JOBS[k].get("started", 0))
+            for k in finished[: len(finished) - _JOBS_KEEP]:
+                JOBS.pop(k, None)
     threading.Thread(target=run_job, args=(job,), daemon=True).start()
     return job
 
@@ -228,7 +276,7 @@ class H(BaseHTTPRequestHandler):
                 if key and not desc:
                     try:
                         desc = zwish.describe_image(img)
-                        DESCRIBE_CACHE[key] = desc
+                        _cache_desc(key, desc)
                     except Exception:
                         desc = None
                 if path == "/api/plan_questions":
@@ -244,7 +292,7 @@ class H(BaseHTTPRequestHandler):
                     image_path=(img if key else None), image_desc=desc,
                     current_en=b.get("current_en", ""))
                 if key and d.get("image_desc"):
-                    DESCRIBE_CACHE[key] = d["image_desc"]
+                    _cache_desc(key, d["image_desc"])
                 return self._json({"refiner": model, "vision_model": zwish.VISION, **d})
 
             # ── 看图点评（本地视觉，不上云）──
@@ -274,24 +322,10 @@ class H(BaseHTTPRequestHandler):
             if path == "/api/delete_history":
                 ts = int(b.get("ts", 0))
                 image = os.path.basename(b.get("image", ""))
-                if os.path.isfile(HIST):
-                    keep = []
-                    with open(HIST, encoding="utf-8") as f:
-                        for line in f:
-                            skip = False
-                            try:
-                                r = json.loads(line)
-                                if r.get("ts") == ts and r.get("image") == image:
-                                    skip = True
-                            except Exception:
-                                skip = True
-                            if not skip:
-                                keep.append(line.rstrip("\n"))
-                    with open(HIST, "w", encoding="utf-8") as f:
-                        f.write("\n".join(x for x in keep if x) + ("\n" if keep else ""))
+                _delete_history_entry(ts, image)
                 return self._json({"ok": True})
             if path == "/api/clear_history":
-                open(HIST, "w").close()
+                _write_history_lines([])
                 return self._json({"ok": True})
 
             # ── 生成：prompt 英文进 ComfyUI，prompt_cn 仅做历史展示 ──
