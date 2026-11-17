@@ -244,9 +244,17 @@ DeepSeek 网页额度用尽时，可手动切换到腾讯元宝网页通道（Is
 
 ### 2026-11-17 · 元宝网页备用通道与 Windows 测试入口修复
 
-**#14 / PR #16 — 新增「元宝 · 网页」备用通道**：DeepSeek 网页额度用尽时的手动备用通道（用户主动选择，不自动轮换账号、不绕过任何限额）。复用 `zds.py` 的 CDP 基础设施（浏览器探测 / WebSocket / helper 注入 / 两把锁），独立 `data/yuanbao_profile` 登录态与选择器；文字提示词发往腾讯元宝，图片与看图点评仍走本地。新增 `zyuanbao.py`、`/api/yuanbao_login`、前端标签与路由、`config.example.json` 配置项，回归 `tests/test_yuanbao_web.py`（25 项：profile 隔离、锁复用、会话清理、Quill 填充、发送状态、桩浏览器复用与无标签泄漏）。合并后已实证全仓 143/143 通过。
+**#14 / PR #16 — 新增「元宝 · 网页」备用通道**：DeepSeek 网页额度用尽时的手动备用通道（用户主动选择，不自动轮换账号、不绕过任何限额）。复用 `zds.py` 的 CDP 基础设施（浏览器探测 / WebSocket / helper 注入 / 两把锁），独立 `data/yuanbao_profile` 登录态与选择器；文字提示词发往腾讯元宝，图片与看图点评仍走本地。新增 `zyuanbao.py`、`/api/yuanbao_login`、前端标签与路由、`config.example.json` 配置项，回归 `tests/test_yuanbao_web.py`（25 项：profile 隔离、锁复用、会话清理、Quill 填充、发送状态、桩浏览器复用与无标签泄漏）。合并后已实证全仓 136/136 通过（统一入口统计，不含元测试）。
 
-**#15 — 统一测试入口在 Windows 默认控制台崩溃**：`tests/run_all.py` 原先打印 `▶` / `✓`，在 GBK(cp936) 控制台抛 `UnicodeEncodeError`。修复用三重保险：输出前缀改 ASCII（`>` / `[OK]`）、stdout/stderr 强制 UTF-8 + `errors=replace`、子进程固定 `PYTHONIOENCODING=utf-8`；并让入口跳过会反向调用自身的元测试以避免递归。回归 `tests/test_run_all_windows.py`（7 项，含 GBK 环境实证退出码 0）。
+**#15 — 统一测试入口在 Windows 默认控制台崩溃**：`tests/run_all.py` 原先打印 `▶` / `✓`，在 GBK(cp936) 控制台抛 `UnicodeEncodeError`。修复用三重保险：输出前缀改 ASCII（`>` / `[OK]`）、stdout/stderr 强制 UTF-8 + `errors=replace`、子进程固定 `PYTHONIOENCODING=utf-8`；并让入口跳过会反向调用自身的元测试以避免递归。回归 `tests/test_run_all_windows.py`。
+
+---
+
+### 2026-11-18 · 测试入口 GBK 解码与统计口径修复
+
+**#17 — GBK 控制台仍失败（解码方向不一致）**：上一轮只把子进程输出固定为 UTF-8，父进程 `subprocess.run(..., text=True)` 仍按 cp936 解码，读取线程抛 `UnicodeDecodeError`，断言统计变成 `0/0`。修复：入口显式 `encoding="utf-8", errors="replace"`；`test_security_fixes.py` 的嵌套子进程同时固定 `PYTHONIOENCODING=utf-8`；元测试与相关测试的输出改用 ASCII 标记，保证单文件也能在 GBK 控制台独立运行。
+
+**#18 — 断言统计漏计**：`test_ui_prompt_actions.py` 的汇总行格式不同（`结果: x 通过 / y 失败`），被入口解析器静默跳过（漏计 10 项）。修复：统一为 `结果：x/y 通过`；元测试新增“汇总行格式一致”和“总断言数等于各文件之和”两条断言，防止再次漂移。修正后统一入口在 GBK 默认环境为 `136/136` 通过。
 
 ---
 

@@ -56,9 +56,9 @@ scripts = re.findall(r"<script>(.*?)</script>", html, re.S)
 js = "\n".join(scripts)
 with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False, encoding="utf-8") as f:
     f.write(js); tmp = f.name
-r = subprocess.run(["node", "--check", tmp], capture_output=True, text=True)
+r = subprocess.run(["node", "--check", tmp], capture_output=True, text=True, encoding="utf-8", errors="replace")
 os.unlink(tmp)
 check("前端 JS 语法有效 (node --check)", r.returncode == 0, r.stderr[:300])
 
-print(f"\n结果: {PASS} 通过 / {FAIL} 失败")
+print(f"\n结果：{PASS}/{PASS + FAIL} 通过")
 sys.exit(1 if FAIL else 0)

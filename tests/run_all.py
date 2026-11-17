@@ -35,13 +35,16 @@ def main():
     total_pass = total_fail = 0
     failed = []
     t0 = time.time()
-    # 保险 3：子进程固定 UTF-8，避免测试脚本符号输出在 GBK 控制台崩溃
+    # 保险 3：子进程固定 UTF-8，避免测试脚本符号输出在 GBK 控制台崩溃；
+    # 父进程也必须用 UTF-8 解码，否则会按 cp936 读 UTF-8 输出并抛
+    # UnicodeDecodeError（Issue #17）。
     env = {**os.environ, "PYTHONIOENCODING": "utf-8"}
     for f in scripts:
         print(f"\n> {f}")  # 保险 1：ASCII 前缀
         r = subprocess.run([sys.executable, os.path.join(HERE, f)],
-                           capture_output=True, text=True, cwd=ROOT,
-                           timeout=300, env=env)
+                           capture_output=True, text=True,
+                           encoding="utf-8", errors="replace",
+                           cwd=ROOT, timeout=300, env=env)
         print("\n".join("  " + x for x in (r.stdout or "").strip().splitlines()[-3:]))
         if r.returncode == 0:
             # 从输出提取 "结果：x/y 通过"
