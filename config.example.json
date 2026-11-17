@@ -41,5 +41,17 @@
     "composer": ["textarea#chat-input", "textarea[placeholder]", "[contenteditable=\"true\"]", "textarea"],
     "answer": [".ds-markdown", "[class*=\"assistant\"] [class*=\"markdown\"]", "[class*=\"message\"] pre", "[class*=\"assistant\"]"],
     "generating": ["button:has-text(\"停止\")", "[class*=\"stop\"]", "button[aria-label*=\"停止\"]"]
+  },
+
+  "_元宝网页说明": "「元宝 · 网页」是 DS 限额时的手动备用通道（DeepSeek 之外多一个无需 API Key 的网页通道）。与 DS·网页共用 CDP 基础设施，但使用独立 profile data/yuanbao_profile，登录态互不相通。headless=false 首次会打开浏览器，请用微信/手机/QQ 登录一次，之后自动复用。文字提示词会发送到腾讯元宝，图片与看图点评仍走本地。不自动轮换账号、不绕过任何平台限额。",
+  "yuanbao_web_browser": "auto",
+  "yuanbao_web_chat_url": "https://yuanbao.tencent.com/",
+  "yuanbao_web_headless": false,
+  "_yuanbao_web_selectors说明": "2026-11-17 真实页面结构（Quill 编辑器 div.ql-editor + div[aria-label=发送]）。元宝网页改版导致定位失败时，在此调整 composer / send / answer 即可，无需改代码。",
+  "yuanbao_web_selectors": {
+    "composer": ["div.ql-editor[contenteditable=\"true\"]", "[contenteditable=\"true\"]"],
+    "send": ["div[aria-label=\"发送\"]", "[aria-label*=\"发送\"]", "button:has-text(\"发送\")"],
+    "answer": [".hyc-content-md", "[class*=\"hyc-content\"]", "[class*=\"markdown\"]"],
+    "generating": []
   }
 }
