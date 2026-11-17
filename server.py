@@ -243,11 +243,17 @@ class H(BaseHTTPRequestHandler):
                 ds_web_ok, ds_web_msg = zds.available()
             except Exception as e:
                 ds_web_ok, ds_web_msg = False, str(e)
+            try:
+                import zyuanbao
+                yb_web_ok, yb_web_msg = zyuanbao.available()
+            except Exception as e:
+                yb_web_ok, yb_web_msg = False, str(e)
             return self._json({
                 "cloud": bool(ps), "vision_model": zwish.VISION,
                 "comfy_port": CFG.get("comfy_port", 8188),
                 "providers": _mask_providers(zwish.PROVIDERS or zwish.load_providers()),
                 "ds_web": {"ok": ds_web_ok, "msg": ds_web_msg},
+                "yuanbao_web": {"ok": yb_web_ok, "msg": yb_web_msg},
                 "ask_count": CFG.get("ask_count", {}),
                 "ready": CFG.get("ready", False),
             })
@@ -327,6 +333,20 @@ class H(BaseHTTPRequestHandler):
                 try: os.startfile(OUTDIR)
                 except Exception as e: return self._json({"ok": False, "error": str(e)})
                 return self._json({"ok": True})
+
+            # ── 元宝通道：打开登录窗口（本地实验通道，见 issue #14）──
+            if path == "/api/yuanbao_login":
+                try:
+                    import zyuanbao
+                    _, ws, _tid = zyuanbao.open_login_window()
+                    try:
+                        ws.close()
+                    except Exception:
+                        pass
+                    return self._json({"ok": True,
+                                       "msg": "已打开元宝登录窗口，请在其中用微信/手机/QQ 登录"})
+                except Exception as e:
+                    return self._json({"ok": False, "error": str(e)})
 
             if path == "/api/delete":
                 name = os.path.basename(b.get("name", ""))
