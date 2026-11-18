@@ -53,6 +53,11 @@ _DEFAULTS = {
     # prompt_en 缺失或含中文（实测元宝会这样），会带纠错指令重试一次，
     # 仍失败则报错，绝不静默拿中文/旧词去生图。关闭则恢复旧的中文直通行为。
     "enforce_english_prompt": True,
+    # ── 自定义 AI 网页通道（issue #23）────────────────────────
+    # 在 custom_web_channels 里声明任意 AI 对话网站（千问 / Grok / 文心一言
+    # 等），即可作为润色通道。每通道独立 profile 与登录态；选择器可配置，
+    # 报错带 DOM 诊断。预置示例见 config.example.json（默认不启用、不含豆包）。
+    "custom_web_channels": [],
     # ── DeepSeek 网页自动化（DS · 网页）──────────────────────
     "ds_web_browser": "auto",           # auto=本机 Chrome/Edge 优先；可填 chrome/msedge/chromium/自定义exe路径
     "ds_web_chat_url": "https://chat.deepseek.com/",
@@ -254,6 +259,7 @@ def ask_recommend(model):
     ac = CFG.get("ask_count", {}) or {}
     is_cloud = isinstance(model, str) and (
         model.startswith("__cloud__") or model.startswith("__ds_")
+        or model.startswith("__web__")
     )
     return int(ac.get("cloud_recommend" if is_cloud else "local_recommend", 2))
 

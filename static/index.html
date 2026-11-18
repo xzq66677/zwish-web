@@ -305,7 +305,7 @@
 const S = { model:"auto", stage:"wish", wish:"", qa:"", answers:[], questions:[], sel:[],
             prompt:null, promptCn:null, w:1024, h:1024, lastImg:null, attach:null, hist:[], seed:null,
             params:{ w:1024, h:1024, den:0.55, denLock:false, steps:8, grow:12, threshold:0.5, seed:null, batch:1 },
-            provs:[], cloudSel:null, dsWebOk:false, dsWebMsg:"", ybOk:false, ybMsg:"", visionModel:"gemma3:4b", comfyPort:8188,
+            provs:[], cloudSel:null, dsWebOk:false, dsWebMsg:"", ybOk:false, ybMsg:"", webChannels:[], visionModel:"gemma3:4b", comfyPort:8188,
             askCfg:null, askCount:2, askMode:"follow" };
 const $ = id => document.getElementById(id);
 const chat = $("chat"), inp = $("inp");
@@ -316,6 +316,7 @@ function modelParam(){
   if (S.model === "ds_api") return "__ds_api__";
   if (S.model === "ds_web") return "__ds_web__";
   if (S.model === "yuanbao") return "__yuanbao_web__";
+  if (S.model.startsWith("web:")) return "__web__:" + S.model.slice(4);
   if (S.model === "cloud") return "__cloud__:" + (S.cloudSel || "");
   return null;   // auto → 本地自由模式
 }
@@ -328,10 +329,17 @@ function setModel(m){
     addErr("元宝网页通道未就绪：" + ((S.ybMsg) || "未检测到本机 Chrome / Edge，安装浏览器后刷新页面即可"));
     return;
   }
+  if (m.startsWith("web:")){
+    const ch = (S.webChannels||[]).find(c => "web:"+c.id === m);
+    if (!ch){ addErr("自定义网页通道不存在或未启用：" + m); return; }
+    if (!ch.ok){ addErr(ch.name + " 未就绪：" + (ch.msg || "未检测到本机浏览器")); return; }
+  }
   S.model = m;
   [["chipUnc","auto"],["chipCen","fine"],["chipDsApi","ds_api"],
    ["chipDsWeb","ds_web"],["chipYuanbao","yuanbao"],["chipCloud","cloud"]].forEach(([id,v]) =>
     $(id).classList.toggle("on", m===v));
+  document.querySelectorAll("[data-webchip]").forEach(el =>
+    el.classList.toggle("on", el.dataset.webchip === m));
   $("cloudSel").style.display = m==="cloud" ? "" : "none";
   if (m === "cloud") refreshCloudSel();
   if (S.askCfg) renderAskBtns();   // 切换通道时刷新推荐问题数
@@ -543,6 +551,7 @@ function setBatch(n){
    - manual 手动：点数字自选
 */
 function askIsCloud(){
+  if (S.model.startsWith("web:")) return true;   // 自定义网页通道 = 云端上下文
   return ["ds_api","ds_web","yuanbao","cloud"].includes(S.model);
 }
 function askRecommended(){
@@ -1039,6 +1048,22 @@ refreshGallery();
   $("chipYuanbao").title = c.yuanbao_web && c.yuanbao_web.ok
     ? ("内置提示词，浏览器自动化 yuanbao.tencent.com（已就绪，备用通道）\n" + S.ybMsg)
     : ("元宝网页通道未就绪：" + (S.ybMsg || "未检测到本机浏览器"));
+  // 自定义 AI 网页通道（issue #23）：动态渲染顶部 chips
+  S.webChannels = c.custom_channels || [];
+  const histChip = document.querySelector('.chip[onclick="openHistory()"]');
+  (S.webChannels||[]).forEach(ch => {
+    if (document.getElementById("chipWeb_" + ch.id)) return;
+    const el = document.createElement("span");
+    el.className = "chip";
+    el.id = "chipWeb_" + ch.id;
+    el.dataset.webchip = "web:" + ch.id;
+    el.textContent = ch.name;
+    el.title = ch.ok ? (ch.name + "（已就绪）\n" + (ch.msg||""))
+                     : (ch.name + " 未就绪：" + (ch.msg||""));
+    el.onclick = () => setModel("web:" + ch.id);
+    if (histChip) histChip.parentElement.insertBefore(el, histChip);
+    else document.querySelector("header").appendChild(el);
+  });
   if (!c.ready) addErr("ComfyUI 路径未配置：请把 config.example.json 复制为 config.json 并填写 base_dir（生图会失败）");
 }catch(e){} })();
 
