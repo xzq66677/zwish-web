@@ -128,6 +128,45 @@
             border-left:1px solid var(--line); box-shadow:-8px 0 30px #1f1e1d1a; z-index:80;
             transition:right .25s; display:flex; flex-direction:column}
   .setpanel.on{right:0}
+  /* 🌐 预设网站选择面板（顶部一键入口） */
+  .hubpanel{position:fixed; top:0; right:-520px; width:500px; max-width:92vw; height:100vh; background:var(--bg);
+            border-left:1px solid var(--line); box-shadow:-8px 0 30px #1f1e1d1a; z-index:80;
+            transition:right .25s; display:flex; flex-direction:column}
+  .hubpanel.on{right:0}
+  .hubgrid{overflow:auto; padding:4px 20px 20px; flex:1}
+  .hubgroup{font-size:12px; color:var(--dim); margin:16px 0 8px; font-weight:600; letter-spacing:.05em}
+  .hubitem{display:flex; align-items:center; gap:10px; padding:9px 12px; margin:5px 0; cursor:pointer;
+           border:1px solid var(--line2); border-radius:9px; transition:all .15s}
+  .hubitem:hover{border-color:var(--acc); background:var(--acc-soft)}
+  .hubitem.on{border-color:var(--acc); background:var(--acc-soft)}
+  .hubitem .hlogo{width:26px; height:26px; flex:0 0 26px; border-radius:7px; display:flex; align-items:center;
+           justify-content:center; font-size:13px; font-weight:700; color:#fff; background:var(--acc)}
+  .hubitem .hname{flex:1; font-size:13px}
+  .hubitem .hname small{display:block; color:var(--dim); font-size:11px; margin-top:1px}
+  .hubitem .hstate{font-size:11px; color:var(--dim); white-space:nowrap}
+  .hubitem .hlogo.emoji{font-size:15px}
+  .hubops{display:flex; gap:3px; margin-left:4px}
+  .hubops span{width:24px; height:24px; display:flex; align-items:center; justify-content:center;
+        border-radius:6px; font-size:12px; cursor:pointer; opacity:.55; transition:all .15s}
+  .hubops span:hover{opacity:1; background:var(--line2)}
+  .hubadd{display:flex; align-items:center; gap:8px; margin-top:16px; padding:11px 14px; cursor:pointer;
+        border:1px dashed var(--line2); border-radius:10px; color:var(--dim); font-size:13px}
+  .hubadd:hover{border-color:var(--acc); color:var(--acc)}
+  .hubform{padding:14px 20px; border-top:1px solid var(--line); display:none; flex-direction:column; gap:9px}
+  .hubform.on{display:flex}
+  .hubform input{width:100%}
+  .hubform .row{display:flex; gap:8px; align-items:center}
+  .hubform label{font-size:12px; color:var(--dim); width:52px; flex:0 0 52px}
+  .iconpick{display:flex; gap:5px; flex-wrap:wrap; flex:1}
+  .iconpick span{width:30px; height:30px; display:flex; align-items:center; justify-content:center;
+        border:1px solid var(--line2); border-radius:8px; cursor:pointer; font-size:15px}
+  .iconpick span.sel{border-color:var(--acc); background:var(--acc-soft)}
+  /* 轻量 toast：替代刷屏的向导气泡 */
+  #toast{position:fixed; left:50%; bottom:28px; transform:translateX(-50%) translateY(20px); z-index:200;
+         background:#2a2825; color:#fff; padding:10px 18px; border-radius:9px; font-size:13px;
+         box-shadow:0 6px 24px #0003; opacity:0; pointer-events:none; transition:all .25s; max-width:80vw}
+  #toast.on{opacity:1; transform:translateX(-50%) translateY(0)}
+  #toast.err{background:#a33}
   .settabs{display:flex; gap:0; padding:0 20px; border-bottom:1px solid var(--line)}
   .settabs .tab{padding:11px 14px; font-size:13px; color:var(--dim); cursor:pointer; border-bottom:2px solid transparent}
   .settabs .tab:hover{color:var(--acc)}
@@ -187,6 +226,7 @@
       <span class="chip" id="chipDsWeb" onclick="setModel('ds_web')" title="内置提示词，浏览器自动化 deepseek.com">DS · 网页</span>
       <span class="chip" id="chipYuanbao" onclick="setModel('yuanbao')" title="内置提示词，浏览器自动化 yuanbao.tencent.com（备用通道）">元宝 · 网页</span>
       <span class="chip" id="chipCloud" onclick="setModel('cloud')" style="display:none">☁️ 云端</span>
+      <span class="chip" id="chipHub" onclick="openHub()" title="一键选择 AI 网站作为润色通道">🌐 AI 网页</span>
       <span class="chip" onclick="openHistory()">📜 历史记录</span>
       <span class="chip" onclick="openSettings()">⚙️ 设置</span>
       <span class="sidebtn" onclick="toggleSide()">🗂 画廊 / 参数</span>
@@ -268,6 +308,7 @@
     <div class="hhead"><b>⚙️ 设置</b><span class="x" onclick="closeSettings()">✕</span></div>
     <div class="settabs">
       <span class="tab on" id="tabProv" onclick="setSetTab('prov')">☁️ 云端供应商</span>
+      <span class="tab" id="tabWeb" onclick="setSetTab('web')">🌐 网页通道</span>
       <span class="tab" id="tabPrompt" onclick="setSetTab('prompt')">📝 内置提示词</span>
     </div>
     <div id="viewProv" style="display:flex; flex-direction:column; flex:1; min-height:0">
@@ -283,6 +324,25 @@
         <button class="btn primary" style="flex:1" onclick="saveSettings()">💾 保存</button>
       </div>
     </div>
+    <div id="viewWeb" style="display:none; flex-direction:column; flex:1; min-height:0">
+      <div style="padding:12px 20px 0; font-size:12px; color:var(--dim); line-height:1.7">
+        声明任意 AI 对话网站（千问 / Grok / 文心一言 / Kimi…），像内置通道一样用于追问 / 精修。
+        <b>每个通道独立登录态，需首次在弹出窗口登录一次</b>；文字会发到该网站，<b>图片与看图点评仍走本地</b>。
+        不自动登录、不绕过平台限额。选择器可按报错里的 DOM 诊断调整。
+      </div>
+      <div style="padding:10px 20px; border-bottom:1px solid var(--line); display:flex; gap:8px; align-items:center; flex-wrap:wrap">
+        <span style="font-size:12px; color:var(--dim); white-space:nowrap">✨ 智能添加</span>
+        <input id="wSmart" list="wSmartList" oninput="smartSuggest()" onkeydown="if(event.key==='Enter')smartAdd()"
+               placeholder="输入网站名/别名，如 千问、Gemini、gpt、豆包…" style="flex:1; min-width:200px">
+        <datalist id="wSmartList"></datalist>
+        <span class="mini" style="width:auto" onclick="smartAdd()">➕ 一键填充</span>
+      </div>
+      <div class="sbody" id="wbody"><div class="hempty">加载中…</div></div>
+      <div style="padding:14px 20px; border-top:1px solid var(--line); display:flex; gap:10px; flex-wrap:wrap">
+        <button class="btn" onclick="addWebChannel()">➕ 新网页通道</button>
+        <button class="btn primary" style="flex:1" onclick="saveWebChannels()">💾 保存网页通道</button>
+      </div>
+    </div>
     <div id="viewPrompt" style="display:none; flex-direction:column; flex:1; min-height:0">
       <div style="padding:12px 20px 0; font-size:12px; color:var(--dim); line-height:1.7">
         这里的模板会作为「内置提示词」注入到 <b>DS · 网页 / DS · API / ☁️ 云端</b> 通道。
@@ -296,6 +356,28 @@
     </div>
   </div>
 
+  <div class="hubpanel" id="hubp">
+    <div class="hhead"><b>🌐 选一个 AI 网站</b><span class="x" onclick="closeHub()">✕</span></div>
+    <div style="padding:12px 20px 0; font-size:12px; color:var(--dim); line-height:1.7">
+      点选即自动配置并切换为润色通道，首次用请按提示在弹出的窗口登录一次。文字发到该网站，图片仍走本地。
+    </div>
+    <div class="hubgrid" id="hublist"><div class="hempty">加载中…</div></div>
+    <div class="hubform" id="hubform">
+      <div class="row"><label>名称</label><input id="hfName" placeholder="如：我的 AI 网站"></div>
+      <div class="row"><label>网址</label><input id="hfUrl" placeholder="https://…"></div>
+      <div class="row" style="align-items:flex-start"><label style="padding-top:6px">图标</label>
+        <div class="iconpick" id="hfIcons"></div></div>
+      <div class="row" style="justify-content:flex-end; gap:8px; margin-top:2px">
+        <span class="mini" style="width:auto" onclick="closeHubForm()">取消</span>
+        <button class="btn primary" onclick="saveCustomSite()">添加</button></div>
+    </div>
+    <div style="padding:0 20px 16px">
+      <div class="hubadd" onclick="openHubForm()">➕ 添加自定义网站（填网址即可，图标可选）</div>
+    </div>
+  </div>
+
+  <div id="toast"></div>
+
   <div class="lightbox" id="lb" onclick="this.classList.remove('on')">
     <img id="lbimg">
     <button class="btn" onclick="useAsInput()">🔁 用这张继续改</button>
@@ -305,7 +387,7 @@
 const S = { model:"auto", stage:"wish", wish:"", qa:"", answers:[], questions:[], sel:[],
             prompt:null, promptCn:null, w:1024, h:1024, lastImg:null, attach:null, hist:[], seed:null,
             params:{ w:1024, h:1024, den:0.55, denLock:false, steps:8, grow:12, threshold:0.5, seed:null, batch:1 },
-            provs:[], cloudSel:null, dsWebOk:false, dsWebMsg:"", ybOk:false, ybMsg:"", webChannels:[], visionModel:"gemma3:4b", comfyPort:8188,
+            provs:[], cloudSel:null, dsWebOk:false, dsWebMsg:"", ybOk:false, ybMsg:"", webChannels:[], webEdit:[], webSource:"config", webPresets:[], visionModel:"gemma3:4b", comfyPort:8188,
             askCfg:null, askCount:2, askMode:"follow" };
 const $ = id => document.getElementById(id);
 const chat = $("chat"), inp = $("inp");
@@ -320,19 +402,19 @@ function modelParam(){
   if (S.model === "cloud") return "__cloud__:" + (S.cloudSel || "");
   return null;   // auto → 本地自由模式
 }
-function setModel(m){
-  if (m === "ds_web" && !S.dsWebOk){
+function setModel(m, force){
+  if (!force && m === "ds_web" && !S.dsWebOk){
     addErr("DS 网页通道未就绪：" + ((S.dsWebMsg) || "未检测到本机 Chrome / Edge，安装浏览器后刷新页面即可（本通道零额外依赖，无需 playwright）"));
     return;
   }
-  if (m === "yuanbao" && !S.ybOk){
+  if (!force && m === "yuanbao" && !S.ybOk){
     addErr("元宝网页通道未就绪：" + ((S.ybMsg) || "未检测到本机 Chrome / Edge，安装浏览器后刷新页面即可"));
     return;
   }
   if (m.startsWith("web:")){
     const ch = (S.webChannels||[]).find(c => "web:"+c.id === m);
     if (!ch){ addErr("自定义网页通道不存在或未启用：" + m); return; }
-    if (!ch.ok){ addErr(ch.name + " 未就绪：" + (ch.msg || "未检测到本机浏览器")); return; }
+    if (!force && !ch.ok){ addErr(ch.name + " 未就绪：" + (ch.msg || "未检测到本机浏览器")); return; }
   }
   S.model = m;
   [["chipUnc","auto"],["chipCen","fine"],["chipDsApi","ds_api"],
@@ -354,7 +436,23 @@ function addWizard(html, tag){
   chat.appendChild(div); scrollEnd(); return div;
 }
 function addErr(t){ addWizard(`<span class="err">⚠ ${esc(t)}</span>`); }
+// 轻量提示：2.6s 自动消失，不往聊天区堆气泡（避免刷屏）
+let _toastTimer=null;
+function toast(msg, isErr){
+  const el = $("toast");
+  if (!el) return;
+  el.textContent = msg;
+  el.classList.toggle("err", !!isErr);
+  el.classList.add("on");
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(()=>el.classList.remove("on"), 2600);
+}
 async function api(path, body){
+  // file:// 双击打开时无 origin，fetch 相对路径会抛英文 "Failed to parse URL"，给出明确指引
+  if (location.protocol === "file:"){
+    toast("请通过程序启动的本地服务访问（http://127.0.0.1:8189），不要直接双击 HTML 文件", true);
+    throw new Error("请以 http://127.0.0.1:8189 访问，不要用 file:// 直接打开");
+  }
   // 请求超时保护：避免后端长时间无响应时前端无限转圈（如 DS·网页通道等待登录）
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), 180000);
@@ -877,12 +975,14 @@ refreshCloudSel();
 function openSettings(){ setSetTab("prov"); loadProvidersUI(); $("setp").classList.add("on"); }
 function closeSettings(){ $("setp").classList.remove("on"); }
 function setSetTab(which){
-  const isProv = which === "prov";
-  $("tabProv").classList.toggle("on", isProv);
-  $("tabPrompt").classList.toggle("on", !isProv);
-  $("viewProv").style.display = isProv ? "flex" : "none";
-  $("viewPrompt").style.display = isProv ? "none" : "flex";
-  if (!isProv) loadPromptsUI();
+  const map = {prov:["tabProv","viewProv"], web:["tabWeb","viewWeb"], prompt:["tabPrompt","viewPrompt"]};
+  Object.entries(map).forEach(([k,[tab,view]]) => {
+    $(tab).classList.toggle("on", k===which);
+    $(view).style.display = k===which ? "flex" : "none";
+  });
+  if (which==="prov") loadProvidersUI();
+  else if (which==="web") loadWebChannelsUI();
+  else loadPromptsUI();
 }
 
 /* ── 内置提示词自定义 ── */
@@ -1050,9 +1150,23 @@ refreshGallery();
     : ("元宝网页通道未就绪：" + (S.ybMsg || "未检测到本机浏览器"));
   // 自定义 AI 网页通道（issue #23）：动态渲染顶部 chips
   S.webChannels = c.custom_channels || [];
+  renderWebChips();
+  if (!c.ready) addErr("ComfyUI 路径未配置：请把 config.example.json 复制为 config.json 并填写 base_dir（生图会失败）");
+}catch(e){} })();
+
+/* ── 自定义网页通道：前端自配置（设置面板 🌐 网页通道）── */
+const WEB_SEL_KEYS = ["composer","send","answer","generating"];
+// 内置预设库（与后端 zwebchat.PRESETS 同源生成，前端自带以便单文件更新也能用）。
+// 后端 /api/webchat_presets 若返回更新版本，会在 loadWebPresets 里按 id 合并覆盖。
+const BUILTIN_PRESETS = [{"id":"qianwen","name":"通义千问","url":"https://tongyi.aliyun.com/qianwen/","aliases":["千问","通义千问","通义","qwen","tongyi","aliyun"],"browser":"auto","headless":false,"selectors":{"composer":["textarea","[contenteditable=\"true\"]","textarea#chat-input"],"send":["button[aria-label*=\"发送\"]","button:has-text(\"发送\")","div[role=\"button\"]:has-text(\"发送\")","[role=\"button\"][aria-label*=\"发送\"]","button[type=\"submit\"]"],"answer":["[class*=\"markdown\"]","[class*=\"answer-item\"]","[class*=\"tongyi-markdown\"]"],"generating":["[class*=\"stop\"]","button[aria-label*=\"停止\"]"]}},{"id":"deepseek","name":"DeepSeek","url":"https://chat.deepseek.com/","aliases":["deepseek","深度求索","ds"],"browser":"auto","headless":false,"selectors":{"composer":["textarea","[contenteditable=\"true\"]","textarea[placeholder]"],"send":["button[aria-label*=\"Send\"]","button[data-testid*=\"send\"]","button[type=\"submit\"]","button:has-text(\"Send\")","[role=\"button\"]:has-text(\"Send\")"],"answer":[".ds-markdown","[class*=\"assistant\"] [class*=\"markdown\"]","[class*=\"message\"] pre"],"generating":["button[aria-label*=\"Stop\"]","[class*=\"stop\"]"]}},{"id":"yuanbao","name":"腾讯元宝","url":"https://yuanbao.tencent.com/chat/","aliases":["元宝","腾讯元宝","yuanbao","tencent"],"browser":"auto","headless":false,"selectors":{"composer":["textarea","[contenteditable=\"true\"]","textarea[placeholder]"],"send":["button[aria-label*=\"发送\"]","button:has-text(\"发送\")","div[role=\"button\"]:has-text(\"发送\")","[role=\"button\"][aria-label*=\"发送\"]","button[type=\"submit\"]"],"answer":["[class*=\"markdown\"]","[class*=\"answer\"]"],"generating":["[class*=\"stop\"]","button[aria-label*=\"停止\"]"]}},{"id":"doubao","name":"豆包","url":"https://www.doubao.com/chat/","aliases":["豆包","doubao","字节"],"browser":"auto","headless":false,"selectors":{"composer":["textarea","[contenteditable=\"true\"]","textarea[data-testid*=\"input\"]"],"send":["button[aria-label*=\"发送\"]","button:has-text(\"发送\")","div[role=\"button\"]:has-text(\"发送\")","[role=\"button\"][aria-label*=\"发送\"]","button[type=\"submit\"]"],"answer":["[class*=\"markdown\"]","[class*=\"answer\"]","[class*=\"message\"] pre"],"generating":["[class*=\"stop\"]","button[aria-label*=\"停止\"]"]}},{"id":"yiyan","name":"文心一言","url":"https://yiyan.baidu.com/","aliases":["文心一言","文心","yiyan","百度","baidu"],"browser":"auto","headless":false,"selectors":{"composer":["textarea","[contenteditable=\"true\"]","textarea[placeholder]"],"send":["button[aria-label*=\"发送\"]","button:has-text(\"发送\")","div[role=\"button\"]:has-text(\"发送\")","[role=\"button\"][aria-label*=\"发送\"]","button[type=\"submit\"]"],"answer":["[class*=\"markdown\"]","[class*=\"answer\"]","[class*=\"result\"]"],"generating":["[class*=\"stop\"]","button[aria-label*=\"停止\"]"]}},{"id":"glm","name":"智谱清言","url":"https://chatglm.cn/","aliases":["智谱","清言","chatglm","glm","智谱清言"],"browser":"auto","headless":false,"selectors":{"composer":["textarea","[contenteditable=\"true\"]","textarea[placeholder]"],"send":["button[aria-label*=\"发送\"]","button:has-text(\"发送\")","div[role=\"button\"]:has-text(\"发送\")","[role=\"button\"][aria-label*=\"发送\"]","button[type=\"submit\"]"],"answer":["[class*=\"markdown\"]","[class*=\"answer\"]","[class*=\"message\"] pre"],"generating":["[class*=\"stop\"]","button[aria-label*=\"停止\"]"]}},{"id":"spark","name":"讯飞星火","url":"https://xinghuo.xfyun.cn/","aliases":["星火","讯飞","spark","xfyun","讯飞星火"],"browser":"auto","headless":false,"selectors":{"composer":["textarea","[contenteditable=\"true\"]","textarea[placeholder]"],"send":["button[aria-label*=\"发送\"]","button:has-text(\"发送\")","div[role=\"button\"]:has-text(\"发送\")","[role=\"button\"][aria-label*=\"发送\"]","button[type=\"submit\"]"],"answer":["[class*=\"markdown\"]","[class*=\"answer\"]","[class*=\"message\"] pre"],"generating":["[class*=\"stop\"]","button[aria-label*=\"停止\"]"]}},{"id":"kimi","name":"Kimi","url":"https://kimi.moonshot.cn/","aliases":["kimi","月之暗面","moonshot"],"browser":"auto","headless":false,"selectors":{"composer":["textarea","[contenteditable=\"true\"]"],"send":["button[aria-label*=\"Send\"]","button[data-testid*=\"send\"]","button[type=\"submit\"]","button:has-text(\"Send\")","[role=\"button\"]:has-text(\"Send\")"],"answer":["[class*=\"markdown\"]","[class*=\"response\"]","[class*=\"message\"] pre","[data-testid*=\"message\"]"],"generating":["button[aria-label*=\"Stop\"]","[class*=\"stop\"]"]}},{"id":"metaso","name":"秘塔 AI","url":"https://metaso.cn/","aliases":["秘塔","metaso","秘塔ai"],"browser":"auto","headless":false,"selectors":{"composer":["textarea","[contenteditable=\"true\"]","textarea[placeholder]"],"send":["button[aria-label*=\"发送\"]","button:has-text(\"发送\")","div[role=\"button\"]:has-text(\"发送\")","[role=\"button\"][aria-label*=\"发送\"]","button[type=\"submit\"]"],"answer":["[class*=\"markdown\"]","[class*=\"answer\"]","[class*=\"message\"] pre"],"generating":["[class*=\"stop\"]","button[aria-label*=\"停止\"]"]}},{"id":"minimax","name":"MiniMax 海螺","url":"https://chat.minimaxi.com/","aliases":["minimax","海螺","abab"],"browser":"auto","headless":false,"selectors":{"composer":["textarea","[contenteditable=\"true\"]","textarea[placeholder]"],"send":["button[aria-label*=\"Send\"]","button[data-testid*=\"send\"]","button[type=\"submit\"]","button:has-text(\"Send\")","[role=\"button\"]:has-text(\"Send\")"],"answer":["[class*=\"markdown\"]","[class*=\"response\"]","[class*=\"message\"] pre","[data-testid*=\"message\"]"],"generating":["button[aria-label*=\"Stop\"]","[class*=\"stop\"]"]}},{"id":"step","name":"阶跃星辰","url":"https://www.stepfun.com/","aliases":["阶跃","step","stepfun","阶跃星辰"],"browser":"auto","headless":false,"selectors":{"composer":["textarea","[contenteditable=\"true\"]","textarea[placeholder]"],"send":["button[aria-label*=\"Send\"]","button[data-testid*=\"send\"]","button[type=\"submit\"]","button:has-text(\"Send\")","[role=\"button\"]:has-text(\"Send\")"],"answer":["[class*=\"markdown\"]","[class*=\"response\"]","[class*=\"message\"] pre","[data-testid*=\"message\"]"],"generating":["button[aria-label*=\"Stop\"]","[class*=\"stop\"]"]}},{"id":"baichuan","name":"百川智能","url":"https://www.baichuan-ai.com/","aliases":["百川","baichuan"],"browser":"auto","headless":false,"selectors":{"composer":["textarea","[contenteditable=\"true\"]","textarea[placeholder]"],"send":["button[aria-label*=\"发送\"]","button:has-text(\"发送\")","div[role=\"button\"]:has-text(\"发送\")","[role=\"button\"][aria-label*=\"发送\"]","button[type=\"submit\"]"],"answer":["[class*=\"markdown\"]","[class*=\"answer\"]","[class*=\"message\"] pre"],"generating":["[class*=\"stop\"]","button[aria-label*=\"停止\"]"]}},{"id":"tiangong","name":"天工 AI","url":"https://www.tiangong.cn/","aliases":["天工","tiangong","昆仑万维"],"browser":"auto","headless":false,"selectors":{"composer":["textarea","[contenteditable=\"true\"]","textarea[placeholder]"],"send":["button[aria-label*=\"发送\"]","button:has-text(\"发送\")","div[role=\"button\"]:has-text(\"发送\")","[role=\"button\"][aria-label*=\"发送\"]","button[type=\"submit\"]"],"answer":["[class*=\"markdown\"]","[class*=\"answer\"]","[class*=\"message\"] pre"],"generating":["[class*=\"stop\"]","button[aria-label*=\"停止\"]"]}},{"id":"sensetime","name":"商量","url":"https://chat.sensetime.com/","aliases":["商量","商汤","sensetime"],"browser":"auto","headless":false,"selectors":{"composer":["textarea","[contenteditable=\"true\"]","textarea[placeholder]"],"send":["button[aria-label*=\"发送\"]","button:has-text(\"发送\")","div[role=\"button\"]:has-text(\"发送\")","[role=\"button\"][aria-label*=\"发送\"]","button[type=\"submit\"]"],"answer":["[class*=\"markdown\"]","[class*=\"answer\"]","[class*=\"message\"] pre"],"generating":["[class*=\"stop\"]","button[aria-label*=\"停止\"]"]}},{"id":"zhihu","name":"知乎直答","url":"https://zhida.zhihu.com/","aliases":["知乎","知乎直答","zhihu"],"browser":"auto","headless":false,"selectors":{"composer":["textarea","[contenteditable=\"true\"]","textarea[placeholder]"],"send":["button[aria-label*=\"发送\"]","button:has-text(\"发送\")","div[role=\"button\"]:has-text(\"发送\")","[role=\"button\"][aria-label*=\"发送\"]","button[type=\"submit\"]"],"answer":["[class*=\"markdown\"]","[class*=\"answer\"]","[class*=\"message\"] pre"],"generating":["[class*=\"stop\"]","button[aria-label*=\"停止\"]"]}},{"id":"pangu","name":"华为盘古","url":"https://pangu.huaweicloud.com/","aliases":["盘古","华为","pangu","华为盘古"],"browser":"auto","headless":false,"selectors":{"composer":["textarea","[contenteditable=\"true\"]","textarea[placeholder]"],"send":["button[aria-label*=\"发送\"]","button:has-text(\"发送\")","div[role=\"button\"]:has-text(\"发送\")","[role=\"button\"][aria-label*=\"发送\"]","button[type=\"submit\"]"],"answer":["[class*=\"markdown\"]","[class*=\"answer\"]","[class*=\"message\"] pre"],"generating":["[class*=\"stop\"]","button[aria-label*=\"停止\"]"]}},{"id":"chatgpt","name":"ChatGPT","url":"https://chatgpt.com/","aliases":["gpt","chatgpt","openai","gpt4","gpt-4","chatgpt"],"browser":"auto","headless":false,"selectors":{"composer":["#prompt-textarea","textarea","[contenteditable=\"true\"]"],"send":["button[data-testid=\"send-button\"]","button[aria-label*=\"Send\"]"],"answer":["[class*=\"markdown\"]","[class*=\"response\"]","[class*=\"message\"] pre","[data-testid*=\"message\"]"],"generating":["button[aria-label*=\"Stop\"]","[class*=\"stop\"]"]}},{"id":"gemini","name":"Gemini","url":"https://gemini.google.com/","aliases":["gemini","谷歌","google","bard","双子星"],"browser":"auto","headless":false,"selectors":{"composer":["textarea[aria-label*=\"Prompt\"]","textarea","[contenteditable=\"true\"]"],"send":["button[aria-label*=\"Send\"]","button[data-testid*=\"send\"]"],"answer":["[class*=\"markdown\"]","[class*=\"response\"]","[class*=\"message\"] pre","[data-testid*=\"message\"]"],"generating":["button[aria-label*=\"Stop\"]","[class*=\"stop\"]"]}},{"id":"claude","name":"Claude","url":"https://claude.ai/","aliases":["claude","anthropic"],"browser":"auto","headless":false,"selectors":{"composer":["[contenteditable=\"true\"]","textarea"],"send":["button[aria-label*=\"Send\"]"],"answer":["[class*=\"markdown\"]","[class*=\"response\"]","[class*=\"message\"] pre","[data-testid*=\"message\"]"],"generating":["button[aria-label*=\"Stop\"]","[class*=\"stop\"]"]}},{"id":"grok","name":"Grok","url":"https://grok.com/","aliases":["grok","马斯克","xai"],"browser":"auto","headless":false,"selectors":{"composer":["textarea","[contenteditable=\"true\"]","textarea[placeholder]"],"send":["button[aria-label*=\"Submit\"]","button[type=\"submit\"]","button:has-text(\"Send\")"],"answer":["[class*=\"markdown\"]","[class*=\"response\"]","[class*=\"message\"] pre","[data-testid*=\"message\"]"],"generating":["button[aria-label*=\"Stop\"]","[class*=\"stop\"]"]}},{"id":"copilot","name":"Microsoft Copilot","url":"https://copilot.microsoft.com/","aliases":["copilot","bing","微软","必应","new bing"],"browser":"auto","headless":false,"selectors":{"composer":["textarea","[contenteditable=\"true\"]","textarea[placeholder]"],"send":["button[aria-label*=\"Send\"]","[class*=\"submit\"]"],"answer":["[class*=\"markdown\"]","[class*=\"response\"]","[class*=\"message\"] pre","[data-testid*=\"message\"]"],"generating":["button[aria-label*=\"Stop\"]","[class*=\"stop\"]"]}},{"id":"perplexity","name":"Perplexity","url":"https://www.perplexity.ai/","aliases":["perplexity","pplx"],"browser":"auto","headless":false,"selectors":{"composer":["textarea","[contenteditable=\"true\"]"],"send":["button[aria-label*=\"Send\"]","button[data-testid*=\"send\"]","button[type=\"submit\"]","button:has-text(\"Send\")","[role=\"button\"]:has-text(\"Send\")"],"answer":["[class*=\"markdown\"]","[class*=\"response\"]","[class*=\"message\"] pre","[data-testid*=\"message\"]"],"generating":["button[aria-label*=\"Stop\"]","[class*=\"stop\"]"]}},{"id":"mistral","name":"Mistral Le Chat","url":"https://chat.mistral.ai/","aliases":["mistral","le chat","mixtral"],"browser":"auto","headless":false,"selectors":{"composer":["textarea","[contenteditable=\"true\"]","textarea[placeholder]"],"send":["button[aria-label*=\"Send\"]","button[data-testid*=\"send\"]","button[type=\"submit\"]","button:has-text(\"Send\")","[role=\"button\"]:has-text(\"Send\")"],"answer":["[class*=\"markdown\"]","[class*=\"response\"]","[class*=\"message\"] pre","[data-testid*=\"message\"]"],"generating":["button[aria-label*=\"Stop\"]","[class*=\"stop\"]"]}},{"id":"huggingchat","name":"HuggingChat","url":"https://huggingface.co/chat/","aliases":["huggingchat","huggingface","hf"],"browser":"auto","headless":false,"selectors":{"composer":["textarea","[contenteditable=\"true\"]","textarea[placeholder]"],"send":["button[aria-label*=\"Send\"]","button[data-testid*=\"send\"]","button[type=\"submit\"]","button:has-text(\"Send\")","[role=\"button\"]:has-text(\"Send\")"],"answer":["[class*=\"markdown\"]","[class*=\"response\"]","[class*=\"message\"] pre","[data-testid*=\"message\"]"],"generating":["button[aria-label*=\"Stop\"]","[class*=\"stop\"]"]}},{"id":"poe","name":"Poe","url":"https://poe.com/","aliases":["poe","quora"],"browser":"auto","headless":false,"selectors":{"composer":["textarea","[contenteditable=\"true\"]","textarea[placeholder]"],"send":["button[aria-label*=\"Send\"]","button[data-testid*=\"send\"]","button[type=\"submit\"]","button:has-text(\"Send\")","[role=\"button\"]:has-text(\"Send\")"],"answer":["[class*=\"markdown\"]","[class*=\"response\"]","[class*=\"message\"] pre","[data-testid*=\"message\"]"],"generating":["button[aria-label*=\"Stop\"]","[class*=\"stop\"]"]}}];
+function webBlank(){
+  return {id:"", name:"", url:"", enabled:true, browser:"auto", headless:false,
+          profile:"", selectors:{composer:[],send:[],answer:[],generating:[]}};
+}
+function renderWebChips(){
+  document.querySelectorAll("[data-webchip]").forEach(el=>el.remove());
   const histChip = document.querySelector('.chip[onclick="openHistory()"]');
   (S.webChannels||[]).forEach(ch => {
-    if (document.getElementById("chipWeb_" + ch.id)) return;
     const el = document.createElement("span");
     el.className = "chip";
     el.id = "chipWeb_" + ch.id;
@@ -1064,8 +1178,347 @@ refreshGallery();
     if (histChip) histChip.parentElement.insertBefore(el, histChip);
     else document.querySelector("header").appendChild(el);
   });
-  if (!c.ready) addErr("ComfyUI 路径未配置：请把 config.example.json 复制为 config.json 并填写 base_dir（生图会失败）");
-}catch(e){} })();
+}
+// ── 智能配置：输入网站名/别名，模糊匹配预设库一键填充（issue #28）──
+function presetMatch(q){
+  const query = (q||"").trim().toLowerCase();
+  const ps = S.webPresets||[];
+  if (!query) return ps.slice(0,12);
+  const scored = [];
+  ps.forEach(p=>{
+    const fields = [p.id, p.name].concat(p.aliases||[]);
+    let best = 0;
+    fields.forEach(f=>{
+      f = String(f).toLowerCase();
+      if (f === query) best = Math.max(best, 100);
+      else if (f.startsWith(query)) best = Math.max(best, 70);
+      else if (f.indexOf(query) >= 0) best = Math.max(best, 40);
+    });
+    if (best) scored.push([best, p.name, p]);
+  });
+  scored.sort((a,b)=> (b[0]-a[0]) || a[1].localeCompare(b[1]));
+  return scored.slice(0,8).map(x=>x[2]);
+}
+async function loadWebPresets(){
+  // 默认用前端内嵌预设（保证只更新 index.html 也能智能添加）
+  const base = (typeof BUILTIN_PRESETS !== "undefined") ? BUILTIN_PRESETS.slice() : [];
+  const byId = {}; base.forEach(p=>byId[p.id]=p);
+  try{
+    const r = await api("/api/webchat_presets");
+    // 后端若提供预设：已有的按 id 覆盖（可热更新选择器），新的追加
+    (r.presets||[]).forEach(p=>{ byId[p.id] = p; });
+  }catch(e){ /* 后端无此接口时静默回退到内嵌预设 */ }
+  S.webPresets = Object.values(byId);
+}
+function smartSuggest(){
+  const inp = $("wSmart"), dl = $("wSmartList");
+  if (!inp || !dl) return;
+  const hits = presetMatch(inp.value);
+  dl.innerHTML = hits.map(p=>`<option value="${esc(p.name)}">${esc(p.url)}</option>`).join("");
+}
+function presetToChannel(p){
+  return {...webBlank(), id:p.id, name:p.name, url:p.url,
+          browser:p.browser||"auto", headless:!!p.headless, enabled:true,
+          selectors:{...webBlank().selectors, ...(p.selectors||{})}};
+}
+function smartAdd(){
+  collectAllWeb();
+  const inp = $("wSmart");
+  if (!inp || !inp.value.trim()){ addErr("请输入网站名，如 千问 / Gemini / gpt"); return; }
+  const hits = presetMatch(inp.value);
+  if (!hits.length){ addErr("没找到「"+inp.value+"」的预设，可点「➕ 新网页通道」手动填写"); return; }
+  const p = hits[0];
+  // 已存在同 id 则提示并定位，不重复添加
+  const exist = (S.webEdit||[]).findIndex(c=>c.id===p.id);
+  if (exist >= 0){ toast("「"+p.name+"」已在列表中（第 "+(exist+1)+" 项）"); return; }
+  S.webEdit.push(presetToChannel(p));
+  inp.value = ""; smartSuggest();
+  renderWebChannels();
+  toast("已添加「"+p.name+"」，点「💾 保存网页通道」生效");
+}
+function smartFill(i){
+  collectAllWeb();
+  const c = S.webEdit[i];
+  if (!c) return;
+  const hits = presetMatch(c.name || c.id || c.url || "");
+  if (!hits.length){ addErr("无法根据当前名称/ID 匹配预设，请在上方「智能添加」里选网站"); return; }
+  const p = hits[0];
+  const filled = [];
+  if (!c.url || c.url !== p.url){ c.url = p.url; filled.push("网址"); }
+  c.selectors = {...webBlank().selectors, ...(p.selectors||{})}; filled.push("选择器");
+  if (!c.name){ c.name = p.name; filled.push("名称"); }
+  renderWebChannels();
+  toast("已按「"+p.name+"」补全："+filled.join("、"));
+}
+// ── 顶部一键入口：预设网站选择面板（issue #28）─────────────────────
+// ── 顶部一键入口：预设网站 + 自定义网站 + 小图标 + 操作按钮（issue #29）──
+const HUB_CN = ["qianwen","deepseek","yuanbao","doubao","yiyan","glm","spark","kimi",
+                "metaso","minimax","step","baichuan","tiangong","sensetime","zhihu","pangu"];
+// AI 二创风格小图标：emoji + 品牌色（预设按 id，自定义用户自选）
+const HUB_ICONS = {
+  qianwen:["🦉","#6d5bd0"], deepseek:["🐋","#4d6bfe"], yuanbao:["💠","#2f7de1"],
+  doubao:["🫘","#3ba3f5"], yiyan:["🌾","#4e7cf0"], glm:["🧠","#3a8fd6"],
+  spark:["✨","#e8912b"], kimi:["🌙","#22252b"], metaso:["🔮","#7d5bd0"],
+  minimax:["⚡","#e05a4f"], step:["👣","#5b6ff0"], baichuan:["🌊","#2f9de0"],
+  tiangong:["🛠","#e07b2b"], sensetime:["👁","#3a9de0"], zhihu:["📚","#3b82f6"],
+  pangu:["🐟","#c0392b"], chatgpt:["🌀","#10a37f"], gemini:["♊","#4285f4"],
+  claude:["✳","#d97757"], grok:["𝕏","#1a1a1a"], copilot:["🧭","#0f7cba"],
+  perplexity:["🔎","#20808d"], mistral:["🌬","#fa500f"], huggingchat:["🤗","#ffb100"],
+  poe:["🦜","#5b53d6"]
+};
+const HUB_PICK = ["🤖","🌟","🧠","🦄","🎨","🚀","💡","🔮","🦉","🐋","🌙","⚡","🎯","🌈","🪄","💎"];
+function hubIcon(p){
+  let userIcon = null;
+  try{ userIcon = (JSON.parse(localStorage.getItem("zwishHubIcons")||"{}"))[p.id]; }catch(e){}
+  if (userIcon) return [userIcon, "#6d5bd0"];
+  if (p.icon) return [p.icon, "#6d5bd0"];
+  return HUB_ICONS[p.id] || ["🌐", "#888"];
+}
+// 自定义网站 = 已配置通道里、id 不在预设库中的项
+function customChannels(){
+  const ids = new Set((S.webPresets||[]).map(p=>p.id));
+  return (S.webChannels||[]).filter(c=>!ids.has(c.id));
+}
+function hubGroups(){
+  const ps = S.webPresets||[];
+  return [["🌏 国内主流", ps.filter(p=>HUB_CN.includes(p.id))],
+          ["🌍 海外主流", ps.filter(p=>!HUB_CN.includes(p.id))],
+          ["⭐ 我的自定义网站", customChannels()]];
+}
+function openHub(){ renderHub(); $("hubp").classList.add("on"); }
+function closeHub(){ closeHubForm(); $("hubp").classList.remove("on"); }
+function renderHub(){
+  const box = $("hublist");
+  if (!box) return;
+  const configured = S.webChannels||[];
+  const groups = hubGroups().filter(([_,ps])=>ps.length);
+  box.innerHTML = groups.map(([title, ps])=>{
+    const items = ps.map(p=>{
+      const ch = configured.find(c=>c.id===p.id);
+      const on = S.model === "web:"+p.id;
+      const state = ch ? (ch.ok ? "✓ 就绪" : "待登录") : "未添加";
+      const [emoji, color] = hubIcon(p);
+      const ops = ch ? `<span class="hubops">
+        <span title="打开登录窗口" onclick="event.stopPropagation();hubLogin('${esc(p.id)}')">🔑</span>
+        <span title="检测输入框状态" onclick="event.stopPropagation();hubStatus('${esc(p.id)}')">🔍</span>
+        <span title="移除此通道" onclick="event.stopPropagation();hubRemove('${esc(p.id)}')">🗑</span></span>` : "";
+      return `<div class="hubitem ${on?"on":""}" onclick="pickPreset('${esc(p.id)}')">
+        <span class="hlogo emoji" style="background:${esc(color)}">${esc(emoji)}</span>
+        <span class="hname">${esc(p.name)}<small>${esc(p.url||"")}</small></span>
+        <span class="hstate">${state}</span>${ops}</div>`;
+    }).join("");
+    return `<div class="hubgroup">${title} <span style="font-weight:400">(${ps.length})</span></div>${items}`;
+  }).join("") || '<div class="hempty">暂无网站，点下方添加 ↓</div>';
+}
+// 操作按钮
+async function hubLogin(id){
+  try{ const r = await api("/api/webchat_login", {id}); toast(r.ok ? "已弹出登录窗口："+id : ("登录失败："+(r.error||""))); }
+  catch(e){ toast("登录失败："+e.message, true); }
+}
+async function hubStatus(id){
+  try{ const r = await api("/api/webchat_status", {id});
+    toast(r.error ? ("❌ "+r.error) : (r.hasComposer?"✅ 输入框就绪":"⚠ 未找到输入框")); }
+  catch(e){ toast("检测失败："+e.message, true); }
+}
+async function hubRemove(id){
+  if (!confirm("确定移除通道「"+id+"」？登录态目录会保留，可重新添加。")) return;
+  try{
+    const cur = await api("/api/webchat_channels");
+    const keep = (cur.channels||[]).filter(c=>c.id!==id);
+    const r = await api("/api/save_webchat_channels", {channels:keep});
+    if (!r.ok) throw new Error(r.error||"移除失败");
+    S.webEdit = (r.channels||[]).map(c=>({...webBlank(), ...c,
+      selectors:{...webBlank().selectors, ...(c.selectors||{})}}));
+    S.webChannels = S.webEdit.filter(c=>c.enabled!==false);
+    if (S.model === "web:"+id) S.model = "auto";
+    renderWebChips(); renderHub(); toast("已移除「"+id+"」");
+  }catch(e){ toast("移除失败："+e.message, true); }
+}
+// 添加自定义网站表单
+let _hubPickIcon = "🤖";
+function openHubForm(){
+  const box = $("hfIcons");
+  if (box && !box.children.length){
+    box.innerHTML = HUB_PICK.map(x=>`<span class="${x===_hubPickIcon?"sel":""}" onclick="hubPickIcon(this,'${x}')">${x}</span>`).join("");
+  }
+  $("hubform").classList.add("on");
+}
+function closeHubForm(){ const f=$("hubform"); if(f) f.classList.remove("on"); }
+function hubPickIcon(el, x){
+  _hubPickIcon = x;
+  el.parentElement.querySelectorAll("span").forEach(s=>s.classList.remove("sel"));
+  el.classList.add("sel");
+}
+async function saveCustomSite(){
+  const name = ($("hfName").value||"").trim();
+  const url = ($("hfUrl").value||"").trim();
+  if (!name){ toast("请填名称", true); return; }
+  if (!/^https?:\/\//i.test(url)){ toast("网址需以 http:// 或 https:// 开头", true); return; }
+  // 生成合法 id：中文名用拼音不方便，直接用 site_+时间戳
+  const id = "site_" + Date.now().toString(36);
+  const ch = {...webBlank(), id, name, url, enabled:true, icon:_hubPickIcon};
+  toast("正在添加「"+name+"」…");
+  try{
+    const cur = await api("/api/webchat_channels");
+    const chans = (cur.channels||[]).map(c=>({...c}));
+    chans.push(ch);
+    const r = await api("/api/save_webchat_channels", {channels:chans});
+    if (!r.ok) throw new Error(r.error||"保存失败");
+    S.webEdit = (r.channels||[]).map(c=>({...webBlank(), ...c,
+      selectors:{...webBlank().selectors, ...(c.selectors||{})}}));
+    S.webChannels = (await api("/api/webchat_channels")).channels||[];
+    // 记录自定义图标到内存（下次刷新从 name 兜底，图标存 localStorage）
+    try{ const m = JSON.parse(localStorage.getItem("zwishHubIcons")||"{}"); m[id]=_hubPickIcon;
+         localStorage.setItem("zwishHubIcons", JSON.stringify(m)); }catch(e){}
+    $("hfName").value=""; $("hfUrl").value="";
+    closeHubForm();
+    renderWebChips(); renderHub();
+    toast("「"+name+"」已添加，点它即可切换（首次请登录）");
+  }catch(e){ toast("添加失败："+e.message, true); }
+}
+async function pickPreset(pid){
+  const p = (S.webPresets||[]).find(x=>x.id===pid)
+         || (S.webChannels||[]).find(x=>x.id===pid);
+  if (!p) return;
+  // 顶部入口可能在设置面板从未打开时使用：确保已加载现有通道
+  if (!S.webEdit) S.webEdit = [];
+  let cur = null;
+  try{
+    cur = await api("/api/webchat_channels");
+    S.webEdit = (cur.channels||[]).map(c=>({...webBlank(), ...c,
+      selectors:{...webBlank().selectors, ...(c.selectors||{})}}));
+    S.webChannels = cur.channels||[];
+  }catch(e){ /* file:// 下会失败，由 api() 给出提示 */ }
+  // 已配置：直接切换过去
+  const exist = (S.webEdit||[]).find(c=>c.id===pid);
+  if (exist && exist.id){
+    closeHub();
+    setModel("web:"+pid, true);
+    toast("已切换到「"+exist.name+"」");
+    return;
+  }
+  // 未配置：自动新建 + 保存 + 切换
+  toast("正在配置「"+p.name+"」…");
+  S.webEdit.push(presetToChannel(p));
+  try{
+    const r = await api("/api/save_webchat_channels", {channels:S.webEdit});
+    if (!r.ok) throw new Error(r.error||"保存失败");
+    S.webEdit = (r.channels||[]).map(c=>({...webBlank(), ...c,
+      selectors:{...webBlank().selectors, ...(c.selectors||{})}}));
+    // 重拉 list_all（含 ok/msg）刷新顶部 chip 与状态
+    try{
+      const c2 = await api("/api/webchat_channels");
+      S.webChannels = (c2.channels||[]).filter(c=>c.enabled!==false);
+    }catch(e){ S.webChannels = (r.channels||[]).filter(c=>c.enabled!==false); }
+    renderWebChips();
+    closeHub();
+    setModel("web:"+pid, true);
+    toast("「"+p.name+"」已配置并切换，首次使用请登录");
+    try{ await api("/api/webchat_login", {id:pid}); }catch(e){}
+  }catch(e){
+    toast("配置失败："+e.message, true);
+  }
+}
+async function loadWebChannelsUI(){
+  const box = $("wbody");
+  await loadWebPresets();
+  try{
+    const r = await api("/api/webchat_channels");
+    S.webEdit = (r.channels||[]).map(c=>({...webBlank(), ...c,
+      selectors:{...webBlank().selectors, ...(c.selectors||{})}}));
+    S.webSource = r.source || "config";
+  }catch(e){ S.webEdit=[]; S.webSource="config"; }
+  renderWebChannels();
+}
+function renderWebChannels(){
+  const el = $("wbody");
+  const list = S.webEdit || [];
+  if (!list.length){
+    el.innerHTML = '<div class="hempty">还没有网页通道。点下方「➕ 新网页通道」添加一个，或从 config.json 的 custom_web_channels 导入。</div>';
+    return;
+  }
+  el.innerHTML = list.map((c,i)=>{
+    const sel = c.selectors||{};
+    const selRow = k => `<div style="display:flex;gap:6px;align-items:center;margin:4px 0">
+      <label style="width:76px;color:var(--dim);font-size:11px">${k}</label>
+      <input data-wsel="${k}" data-i="${i}" value="${esc((sel[k]||[]).join(', '))}"
+             placeholder="逗号分隔的 CSS 选择器"></div>`;
+    return `<div class="prov" style="margin-bottom:12px" data-wi="${i}">
+      <div class="prow"><label>名称</label>
+        <input data-wf="name" data-i="${i}" value="${esc(c.name||"")}" placeholder="千问 · 网页">
+        <label class="sw"><input type="checkbox" data-wf="enabled" data-i="${i}" ${c.enabled!==false?"checked":""}> 启用</label>
+        <span class="mini" style="width:auto" onclick="delWebChannel(${i})">🗑 删除</span></div>
+      <div class="prow"><label>ID</label>
+        <input data-wf="id" data-i="${i}" value="${esc(c.id||"")}" placeholder="qianwen（小写字母/数字/-/_）"></div>
+      <div class="prow"><label>网址</label>
+        <input data-wf="url" data-i="${i}" value="${esc(c.url||"")}" placeholder="https://…"></div>
+      <div class="prow"><label>浏览器</label>
+        <input data-wf="browser" data-i="${i}" value="${esc(c.browser||"auto")}" placeholder="auto">
+        <label class="sw"><input type="checkbox" data-wf="headless" data-i="${i}" ${c.headless?"checked":""}> 无头</label>
+        <span class="mini" style="width:auto" onclick="smartFill(${i})" title="根据名称/ID 从预设库补全网址与选择器">✨ 补全</span>
+        <span class="mini" style="width:auto" onclick="webLogin(${i})">🔑 打开登录</span>
+        <span class="mini" style="width:auto" onclick="webStatus(${i})">🔍 检测状态</span></div>
+      <div class="prow"><label>选择器</label><span class="tres" id="wst${i}"></span></div>
+      <div style="padding:2px 0 6px">${WEB_SEL_KEYS.map(selRow).join("")}</div>
+    </div>`;
+  }).join("");
+  el.querySelectorAll("[data-wf],[data-wsel]").forEach(inp=>{
+    inp.oninput = ()=>collectWeb(inp);
+    inp.onchange = ()=>collectWeb(inp);
+  });
+}
+function collectWeb(inp){
+  const i = +inp.dataset.i, c = S.webEdit[i];
+  if (!c) return;
+  if (inp.dataset.wf){
+    const f = inp.dataset.wf;
+    c[f] = (f==="enabled"||f==="headless") ? inp.checked : inp.value;
+  } else if (inp.dataset.wsel){
+    const k = inp.dataset.wsel;
+    c.selectors[k] = inp.value.split(/[,，]/).map(s=>s.trim()).filter(Boolean);
+  }
+}
+function addWebChannel(){ collectAllWeb(); S.webEdit.push(webBlank()); renderWebChannels(); }
+function delWebChannel(i){ collectAllWeb(); S.webEdit.splice(i,1); renderWebChannels(); }
+function collectAllWeb(){ document.querySelectorAll("#wbody [data-wf],#wbody [data-wsel]").forEach(inp=>collectWeb(inp)); }
+async function saveWebChannels(){
+  collectAllWeb();
+  try{
+    const r = await api("/api/save_webchat_channels", {channels:S.webEdit});
+    if (!r.ok) throw new Error(r.error||"保存失败");
+    S.webEdit = (r.channels||[]).map(c=>({...webBlank(), ...c,
+      selectors:{...webBlank().selectors, ...(c.selectors||{})}}));
+    S.webSource = "user";
+    renderWebChannels();
+    // 刷新顶部 chip：拉最新 config 的 enable 通道状态
+    const cfg = await api("/api/config");
+    S.webChannels = cfg.custom_channels||[];
+    renderWebChips();
+    toast("网页通道已保存，顶部已更新");
+  }catch(e){ toast("保存失败："+e.message, true); }
+}
+async function webLogin(i){
+  collectAllWeb();
+  const c = S.webEdit[i];
+  if (!c.id){ addErr("请先填写通道 ID 再登录"); return; }
+  try{
+    const r = await api("/api/webchat_login", {id:c.id});
+    addWizard(r.ok ? (r.msg||"已打开登录窗口") : ("登录失败："+(r.error||"")));
+  }catch(e){ addErr("打开登录窗口失败："+e.message); }
+}
+async function webStatus(i){
+  collectAllWeb();
+  const c = S.webEdit[i];
+  if (!c.id){ addErr("请先填写通道 ID"); return; }
+  const el = $("wst"+i);
+  if (el) el.textContent = "检测中…";
+  try{
+    const r = await api("/api/webchat_status", {id:c.id});
+    const txt = r.error ? ("❌ "+r.error)
+      : `${r.hasComposer?"✅ 输入框就绪":"⚠ 未找到输入框"} · ${r.title||""}`;
+    if (el) el.textContent = txt;
+  }catch(e){ if (el) el.textContent = "❌ "+e.message; }
+}
 
 </script>
 </body>

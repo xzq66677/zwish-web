@@ -301,6 +301,21 @@ class H(BaseHTTPRequestHandler):
             return self._json(zprompts.state())
         if path == "/api/providers":
             return self._json({"providers": _mask_providers(zwish.PROVIDERS or zwish.load_providers())})
+        if path == "/api/webchat_presets":
+            # 智能配置预设库：输入网站名/别名即可自动填充 url 与选择器
+            try:
+                import zwebchat
+                return self._json({"presets": zwebchat.PRESETS})
+            except Exception as e:
+                return self._json({"error": str(e)})
+        if path == "/api/webchat_channels":
+            # 网页自配置通道列表（含 disabled），供设置面板编辑
+            try:
+                import zwebchat
+                return self._json({"channels": zwebchat.list_all(),
+                                   "source": "user" if zwebchat.load_user_channels() is not None else "config"})
+            except Exception as e:
+                return self._json({"error": str(e)})
         if path == "/api/history":
             recs = []
             if os.path.isfile(HIST):
@@ -367,6 +382,14 @@ class H(BaseHTTPRequestHandler):
                 import zprompts
                 saved = zprompts.save_overrides(b.get("prompts", {}))
                 return self._json({"ok": True, "custom": list(saved.keys())})
+
+            if path == "/api/save_webchat_channels":
+                # 网页自配置：整体保存自定义网页通道列表（含校验）
+                import zwebchat
+                ok, msg, cleaned = zwebchat.save_user_channels(b.get("channels"))
+                if not ok:
+                    return self._json({"ok": False, "error": msg})
+                return self._json({"ok": True, "msg": msg, "channels": cleaned})
 
             if path == "/api/open_folder":
                 try: os.startfile(OUTDIR)
