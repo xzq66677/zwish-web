@@ -59,6 +59,27 @@ def _is_loopback_host(h):
         return False
 
 
+def _split_hostport(raw, default_port):
+    """把 Host 头 / Origin 的 host:port 拆成 (host, port)。
+
+    支持 IPv6 字面量（[::1]:8189）；无端口时用 default_port
+    （Host 缺端口 → 服务监听端口；Origin 缺端口 → scheme 默认端口）。
+    """
+    raw = (raw or "").strip()
+    if not raw:
+        return "", default_port
+    if raw.startswith("["):                       # IPv6：[::1]:8189
+        inner, _, rest = raw[1:].partition("]")
+        if rest.startswith(":") and rest[1:].isdigit():
+            return inner.lower(), int(rest[1:])
+        return inner.lower(), default_port
+    if ":" in raw:
+        host, _, port = raw.rpartition(":")
+        if port.isdigit():
+            return host.strip("[]").lower(), int(port)
+    return raw.strip("[]").lower(), default_port
+
+
 def _mask_providers(ps):
     """API Key 脱敏：只回 has_key 标志，不把 key 明文发给浏览器。
 
@@ -208,15 +229,27 @@ class H(BaseHTTPRequestHandler):
         """本机服务安全边界（防 CSRF / DNS rebinding）。
 
         - Host 头必须指向本机回环（拦 DNS rebinding：外部页面把域名解析到 127.0.0.1 再访问）；
-        - POST 请求若带 Origin（浏览器对跨源 POST 一定带），其主机必须也是本机回环。
+        - POST 请求若带 Origin（浏览器对跨源 POST 一定带），其 **host 和端口必须与请求
+          的 Host 完全一致**，且仍要求回环主机（issue #20：原先只比主机不比端口，
+          本机其他端口的页面也能通过校验发起状态变更）。
         """
-        host = (self.headers.get("Host") or "").rsplit(":", 1)[0]
+        host_raw = self.headers.get("Host") or ""
+        host, hport = _split_hostport(host_raw, PORT)
         if host and not _is_loopback_host(host):
             return False
         origin = self.headers.get("Origin")
         if origin:
-            ohost = urlparse(origin).hostname or ""
+            o = urlparse(origin)
+            ohost = (o.hostname or "").lower()
             if not _is_loopback_host(ohost):
+                return False
+            try:
+                oport = o.port
+            except ValueError:                 # 非法端口 → 直接拒绝
+                return False
+            if oport is None:
+                oport = 443 if (o.scheme or "").lower() == "https" else 80
+            if ohost != host or oport != hport:
                 return False
         return True
 

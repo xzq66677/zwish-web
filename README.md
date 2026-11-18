@@ -240,6 +240,12 @@ DS / 元宝之外，可在 `config.json` 的 `custom_web_channels` 里声明任�
 
 ## 变更记录
 
+### 2026-11-18 · Origin 端口精确比对（#20）
+
+`_same_origin()` 原先只比对回环主机不比对端口——本机其他端口的页面（如 `127.0.0.1:3000` 的开发服务器）也能向 `127.0.0.1:8189` 发起状态变更（`/api/save_providers`、`/api/delete` 等）。修复后 Origin 的 **host 和端口必须与请求 Host 完全一致**（Host 缺端口对齐服务监听端口，Origin 缺端口按 scheme 默认端口，IPv6 字面量支持，非法端口直接拒绝）。真实浏览器同源访问不受影响（Origin 恒等于页面源）。回归 `tests/test_origin_port.py`（18 项）。
+
+---
+
 ### 2026-11-18 · 自定义 AI 网页通道（custom_web_channels）
 
 **#23 — 配置驱动的通用网页自动化**：DS / 元宝之外，可在 `config.json` 的 `custom_web_channels` 声明任意 AI 对话网站（千问、Grok、文心一言、Kimi…）作为润色通道。`config.example.json` 附带三个示例（**默认关闭**，预置不含豆包）。每通道独立 profile 与登录态（默认 `data/webchat_<id>_profile`，可用 `profile` 字段复用）；填充自适应 textarea / contenteditable，发送支持 aria-disabled 等待与 Enter 兜底；报错带 DOM 诊断（候选节点数 / 页面文本长度），网页改版只需调选择器。新增接口：`/api/config` 的 `custom_channels` 状态、`POST /api/webchat_login`、`POST /api/webchat_status`。所有自定义通道与 DS / 元宝共用会话锁串行执行，并注入通道契约（禁承诺生图、`prompt_en` English only），英文契约由 `zwish._guarded_parse` 统一兜底。
