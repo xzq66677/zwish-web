@@ -93,6 +93,28 @@ check("预设加载被 UI 调用", "await loadWebPresets()" in html)
 check("S 含 webPresets 状态", "webPresets:[]" in html)
 check("下拉候选走 esc", 'esc(p.url)' in html and 'esc(p.name)' in html)
 
+# 顶部一键入口（pickPreset）：选预设→自动配置+保存+切换，不进设置面板
+check("顶部有 AI 网页入口 chip", 'id="chipHub"' in html and 'onclick="openHub()"' in html)
+check("预设面板存在", 'id="hubp"' in html and 'id="hublist"' in html)
+for fn in ("openHub", "closeHub", "renderHub", "pickPreset", "hubGroups", "toast"):
+    check(f"前端有 {fn}()", f"function {fn}(" in html)
+check("pickPreset 自动保存并切换",
+      '"/api/save_webchat_channels"' in html.split("function pickPreset")[1].split("async function loadWebChannelsUI")[0]
+      and "setModel(\"web:\"+pid, true)" in html)
+check("预设按国内/海外分组", "HUB_CN" in html and "国内主流" in html and "海外主流" in html)
+check("setModel 支持 force 跳过就绪校验", "function setModel(m, force)" in html
+      and "!force && !ch.ok" in html)
+check("预设项走 esc（id/名/网址）",
+      "esc(p.id)" in html and "esc(p.name)" in html and "esc(p.url)" in html)
+
+# 前端优化：toast 替代刷屏 + file:// 友好提示
+check("有 toast 节点", 'id="toast"' in html and "#toast{" in html)
+check("file:// 检测给出中文提示",
+      'location.protocol === "file:"' in html and "不要直接双击 HTML" in html)
+check("智能添加不再往聊天区刷屏",
+      'toast("已添加「"+p.name+"」' in html
+      and 'addWizard("已智能填充' not in html)
+
 # 前端内嵌预设（关键：单文件更新 / 后端接口缺失时仍可用，修复实测"找不到 gemini"）
 check("前端内嵌 BUILTIN_PRESETS 常量", "const BUILTIN_PRESETS = [" in html)
 check("loadWebPresets 以内嵌为准", "BUILTIN_PRESETS.slice()" in html

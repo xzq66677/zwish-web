@@ -128,6 +128,28 @@
             border-left:1px solid var(--line); box-shadow:-8px 0 30px #1f1e1d1a; z-index:80;
             transition:right .25s; display:flex; flex-direction:column}
   .setpanel.on{right:0}
+  /* 🌐 预设网站选择面板（顶部一键入口） */
+  .hubpanel{position:fixed; top:0; right:-520px; width:500px; max-width:92vw; height:100vh; background:var(--bg);
+            border-left:1px solid var(--line); box-shadow:-8px 0 30px #1f1e1d1a; z-index:80;
+            transition:right .25s; display:flex; flex-direction:column}
+  .hubpanel.on{right:0}
+  .hubgrid{overflow:auto; padding:4px 20px 20px; flex:1}
+  .hubgroup{font-size:12px; color:var(--dim); margin:16px 0 8px; font-weight:600; letter-spacing:.05em}
+  .hubitem{display:flex; align-items:center; gap:10px; padding:9px 12px; margin:5px 0; cursor:pointer;
+           border:1px solid var(--line2); border-radius:9px; transition:all .15s}
+  .hubitem:hover{border-color:var(--acc); background:var(--acc-soft)}
+  .hubitem.on{border-color:var(--acc); background:var(--acc-soft)}
+  .hubitem .hlogo{width:26px; height:26px; flex:0 0 26px; border-radius:7px; display:flex; align-items:center;
+           justify-content:center; font-size:13px; font-weight:700; color:#fff; background:var(--acc)}
+  .hubitem .hname{flex:1; font-size:13px}
+  .hubitem .hname small{display:block; color:var(--dim); font-size:11px; margin-top:1px}
+  .hubitem .hstate{font-size:11px; color:var(--dim); white-space:nowrap}
+  /* 轻量 toast：替代刷屏的向导气泡 */
+  #toast{position:fixed; left:50%; bottom:28px; transform:translateX(-50%) translateY(20px); z-index:200;
+         background:#2a2825; color:#fff; padding:10px 18px; border-radius:9px; font-size:13px;
+         box-shadow:0 6px 24px #0003; opacity:0; pointer-events:none; transition:all .25s; max-width:80vw}
+  #toast.on{opacity:1; transform:translateX(-50%) translateY(0)}
+  #toast.err{background:#a33}
   .settabs{display:flex; gap:0; padding:0 20px; border-bottom:1px solid var(--line)}
   .settabs .tab{padding:11px 14px; font-size:13px; color:var(--dim); cursor:pointer; border-bottom:2px solid transparent}
   .settabs .tab:hover{color:var(--acc)}
@@ -187,6 +209,7 @@
       <span class="chip" id="chipDsWeb" onclick="setModel('ds_web')" title="内置提示词，浏览器自动化 deepseek.com">DS · 网页</span>
       <span class="chip" id="chipYuanbao" onclick="setModel('yuanbao')" title="内置提示词，浏览器自动化 yuanbao.tencent.com（备用通道）">元宝 · 网页</span>
       <span class="chip" id="chipCloud" onclick="setModel('cloud')" style="display:none">☁️ 云端</span>
+      <span class="chip" id="chipHub" onclick="openHub()" title="一键选择 AI 网站作为润色通道">🌐 AI 网页</span>
       <span class="chip" onclick="openHistory()">📜 历史记录</span>
       <span class="chip" onclick="openSettings()">⚙️ 设置</span>
       <span class="sidebtn" onclick="toggleSide()">🗂 画廊 / 参数</span>
@@ -316,6 +339,16 @@
     </div>
   </div>
 
+  <div class="hubpanel" id="hubp">
+    <div class="hhead"><b>🌐 选一个 AI 网站</b><span class="x" onclick="closeHub()">✕</span></div>
+    <div style="padding:12px 20px 0; font-size:12px; color:var(--dim); line-height:1.7">
+      点选即自动配置并切换为润色通道，首次用请按提示在弹出的窗口登录一次。文字发到该网站，图片仍走本地。
+    </div>
+    <div class="hubgrid" id="hublist"><div class="hempty">加载中…</div></div>
+  </div>
+
+  <div id="toast"></div>
+
   <div class="lightbox" id="lb" onclick="this.classList.remove('on')">
     <img id="lbimg">
     <button class="btn" onclick="useAsInput()">🔁 用这张继续改</button>
@@ -340,19 +373,19 @@ function modelParam(){
   if (S.model === "cloud") return "__cloud__:" + (S.cloudSel || "");
   return null;   // auto → 本地自由模式
 }
-function setModel(m){
-  if (m === "ds_web" && !S.dsWebOk){
+function setModel(m, force){
+  if (!force && m === "ds_web" && !S.dsWebOk){
     addErr("DS 网页通道未就绪：" + ((S.dsWebMsg) || "未检测到本机 Chrome / Edge，安装浏览器后刷新页面即可（本通道零额外依赖，无需 playwright）"));
     return;
   }
-  if (m === "yuanbao" && !S.ybOk){
+  if (!force && m === "yuanbao" && !S.ybOk){
     addErr("元宝网页通道未就绪：" + ((S.ybMsg) || "未检测到本机 Chrome / Edge，安装浏览器后刷新页面即可"));
     return;
   }
   if (m.startsWith("web:")){
     const ch = (S.webChannels||[]).find(c => "web:"+c.id === m);
     if (!ch){ addErr("自定义网页通道不存在或未启用：" + m); return; }
-    if (!ch.ok){ addErr(ch.name + " 未就绪：" + (ch.msg || "未检测到本机浏览器")); return; }
+    if (!force && !ch.ok){ addErr(ch.name + " 未就绪：" + (ch.msg || "未检测到本机浏览器")); return; }
   }
   S.model = m;
   [["chipUnc","auto"],["chipCen","fine"],["chipDsApi","ds_api"],
@@ -374,7 +407,23 @@ function addWizard(html, tag){
   chat.appendChild(div); scrollEnd(); return div;
 }
 function addErr(t){ addWizard(`<span class="err">⚠ ${esc(t)}</span>`); }
+// 轻量提示：2.6s 自动消失，不往聊天区堆气泡（避免刷屏）
+let _toastTimer=null;
+function toast(msg, isErr){
+  const el = $("toast");
+  if (!el) return;
+  el.textContent = msg;
+  el.classList.toggle("err", !!isErr);
+  el.classList.add("on");
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(()=>el.classList.remove("on"), 2600);
+}
 async function api(path, body){
+  // file:// 双击打开时无 origin，fetch 相对路径会抛英文 "Failed to parse URL"，给出明确指引
+  if (location.protocol === "file:"){
+    toast("请通过程序启动的本地服务访问（http://127.0.0.1:8189），不要直接双击 HTML 文件", true);
+    throw new Error("请以 http://127.0.0.1:8189 访问，不要用 file:// 直接打开");
+  }
   // 请求超时保护：避免后端长时间无响应时前端无限转圈（如 DS·网页通道等待登录）
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), 180000);
@@ -1152,11 +1201,11 @@ function smartAdd(){
   const p = hits[0];
   // 已存在同 id 则提示并定位，不重复添加
   const exist = (S.webEdit||[]).findIndex(c=>c.id===p.id);
-  if (exist >= 0){ addWizard("「"+p.name+"」已在列表中（第 "+(exist+1)+" 项），已为你定位"); return; }
+  if (exist >= 0){ toast("「"+p.name+"」已在列表中（第 "+(exist+1)+" 项）"); return; }
   S.webEdit.push(presetToChannel(p));
   inp.value = ""; smartSuggest();
   renderWebChannels();
-  addWizard("已智能填充「"+p.name+"」→ "+p.url+"（记得点保存）");
+  toast("已添加「"+p.name+"」，点「💾 保存网页通道」生效");
 }
 function smartFill(i){
   collectAllWeb();
@@ -1170,7 +1219,76 @@ function smartFill(i){
   c.selectors = {...webBlank().selectors, ...(p.selectors||{})}; filled.push("选择器");
   if (!c.name){ c.name = p.name; filled.push("名称"); }
   renderWebChannels();
-  addWizard("已按「"+p.name+"」补全："+filled.join("、")+"（记得点保存）");
+  toast("已按「"+p.name+"」补全："+filled.join("、"));
+}
+// ── 顶部一键入口：预设网站选择面板（issue #28）─────────────────────
+const HUB_CN = ["qianwen","deepseek","yuanbao","doubao","yiyan","glm","spark","kimi",
+                "metaso","minimax","step","baichuan","tiangong","sensetime","zhihu","pangu"];
+function hubGroups(){
+  const ps = S.webPresets||[];
+  return [["🌏 国内主流", ps.filter(p=>HUB_CN.includes(p.id))],
+          ["🌍 海外主流", ps.filter(p=>!HUB_CN.includes(p.id))]];
+}
+function openHub(){ renderHub(); $("hubp").classList.add("on"); }
+function closeHub(){ $("hubp").classList.remove("on"); }
+function renderHub(){
+  const box = $("hublist");
+  if (!box) return;
+  const configured = S.webChannels||[];
+  box.innerHTML = hubGroups().map(([title, ps])=>{
+    const items = ps.map(p=>{
+      const ch = configured.find(c=>c.id===p.id);
+      const on = S.model === "web:"+p.id;
+      const state = ch ? (ch.ok ? "✓ 已就绪" : "待登录") : "";
+      const initial = (p.name||"?").replace(/[^A-Za-z\u4e00-\u9fa5]/g,"").slice(0,1) || "🌐";
+      return `<div class="hubitem ${on?"on":""}" onclick="pickPreset('${esc(p.id)}')">
+        <span class="hlogo">${esc(initial)}</span>
+        <span class="hname">${esc(p.name)}<small>${esc(p.url)}</small></span>
+        <span class="hstate">${state}</span></div>`;
+    }).join("");
+    return `<div class="hubgroup">${title}</div>${items}`;
+  }).join("");
+}
+async function pickPreset(pid){
+  const p = (S.webPresets||[]).find(x=>x.id===pid);
+  if (!p) return;
+  // 顶部入口可能在设置面板从未打开时使用：确保已加载现有通道
+  if (!S.webEdit) S.webEdit = [];
+  try{
+    const cur = await api("/api/webchat_channels");
+    S.webEdit = (cur.channels||[]).map(c=>({...webBlank(), ...c,
+      selectors:{...webBlank().selectors, ...(c.selectors||{})}}));
+    S.webChannels = cur.channels||[];
+  }catch(e){ /* file:// 下会失败，由 api() 给出提示 */ }
+  // 已配置：直接切换过去
+  const exist = (S.webEdit||[]).find(c=>c.id===pid);
+  if (exist && exist.id){
+    closeHub();
+    setModel("web:"+pid, true);
+    toast("已切换到「"+exist.name+"」");
+    return;
+  }
+  // 未配置：自动新建 + 保存 + 切换
+  toast("正在配置「"+p.name+"」…");
+  S.webEdit.push(presetToChannel(p));
+  try{
+    const r = await api("/api/save_webchat_channels", {channels:S.webEdit});
+    if (!r.ok) throw new Error(r.error||"保存失败");
+    S.webEdit = (r.channels||[]).map(c=>({...webBlank(), ...c,
+      selectors:{...webBlank().selectors, ...(c.selectors||{})}}));
+    // 重拉 list_all（含 ok/msg）刷新顶部 chip 与状态
+    try{
+      const cur = await api("/api/webchat_channels");
+      S.webChannels = (cur.channels||[]).filter(c=>c.enabled!==false);
+    }catch(e){ S.webChannels = (r.channels||[]).filter(c=>c.enabled!==false); }
+    renderWebChips();
+    closeHub();
+    setModel("web:"+pid, true);
+    toast("「"+p.name+"」已配置并切换，首次使用请登录");
+    try{ await api("/api/webchat_login", {id:pid}); }catch(e){}
+  }catch(e){
+    toast("配置失败："+e.message, true);
+  }
 }
 async function loadWebChannelsUI(){
   const box = $("wbody");
@@ -1247,8 +1365,8 @@ async function saveWebChannels(){
     const cfg = await api("/api/config");
     S.webChannels = cfg.custom_channels||[];
     renderWebChips();
-    addWizard("💾 网页通道已保存，顶部已更新（如新增通道请在该窗口首次登录）");
-  }catch(e){ addErr("保存网页通道失败："+e.message); }
+    toast("网页通道已保存，顶部已更新");
+  }catch(e){ toast("保存失败："+e.message, true); }
 }
 async function webLogin(i){
   collectAllWeb();
