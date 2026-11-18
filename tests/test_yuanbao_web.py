@@ -68,9 +68,10 @@ def main():
     print("[4] 前端与 API 接线")
     root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     fe = open(os.path.join(root, "static", "index.html"), encoding="utf-8").read()
-    check("存在元宝 chip", 'id="chipYuanbao"' in fe)
+    # 元宝已内收进「🌐 AI 网页」：顶部不再有独立 chip，统一由网页面板选择
+    check("顶部已无独立元宝 chip（已内收）", 'id="chipYuanbao"' not in fe)
     check("modelParam 映射 __yuanbao_web__", '"yuanbao") return "__yuanbao_web__"' in fe)
-    check("chip 参与选中态切换", '["chipYuanbao","yuanbao"]' in fe)
+    check("元宝在 AI 网页面板预设中", '"id":"yuanbao"' in fe or '"id": "yuanbao"' in fe)
     check("云端追问推荐包含元宝", '"ds_web","yuanbao"' in fe)
     srv = open(os.path.join(root, "server.py"), encoding="utf-8").read()
     check("/api/config 返回 yuanbao_web 状态", '"yuanbao_web": {"ok"' in srv)
