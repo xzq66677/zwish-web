@@ -259,6 +259,17 @@ class H(BaseHTTPRequestHandler):
             return self._json({"error": "请求来源不是本机，已被拒绝"}, 403)
         if path in ("/", "/index.html"):
             return self._file(os.path.join(STATIC, "index.html"), "text/html; charset=utf-8")
+        if path.startswith("/icons/"):
+            # 各家 AI 的二创形象图标（Q版吉祥物），仅允许白名单文件名
+            name = os.path.basename(path[len("/icons/"):])
+            if not re.fullmatch(r"[a-z0-9_-]+\.(png|svg|webp|jpg|jpeg)", name or ""):
+                return self._json({"error": "bad icon name"}, 400)
+            fp = os.path.join(STATIC, "icons", name)
+            if os.path.isfile(fp):
+                ctype = {"png":"image/png","svg":"image/svg+xml","webp":"image/webp",
+                         "jpg":"image/jpeg","jpeg":"image/jpeg"}[name.rsplit(".",1)[1].lower()]
+                return self._file(fp, ctype)
+            return self._json({"error": "not found"}, 404)
         if path.startswith("/assets/"):
             name = os.path.basename(path[len("/assets/"):])
             fp = os.path.join(OUTDIR, name)
