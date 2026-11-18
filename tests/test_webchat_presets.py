@@ -154,11 +154,21 @@ if m:
 # JS 语法
 m = re.search(r"<script>(.*?)</script>", html, re.S)
 js = m.group(1) if m else ""
-open("/tmp/preset_check.js", "w", encoding="utf-8").write(js)
+# 用系统临时目录：Windows 上 "/tmp" 会解析成当前盘符根下的 C:\tmp（通常不存在），
+# 直接写会 FileNotFoundError，与代码本身无关。
 import subprocess
-r = subprocess.run(["node", "--check", "/tmp/preset_check.js"],
+import tempfile
+tmpdir = tempfile.mkdtemp(prefix="zwish_preset_")
+jsfile = os.path.join(tmpdir, "preset_check.js")
+open(jsfile, "w", encoding="utf-8").write(js)
+r = subprocess.run(["node", "--check", jsfile],
                    capture_output=True, text=True)
 check("前端 JS 语法合法", r.returncode == 0, r.stderr.strip()[:120])
+try:
+    os.remove(jsfile)
+    os.rmdir(tmpdir)
+except OSError:
+    pass
 
 print(f"\n结果：{PASSED}/{PASSED + FAILED} 通过")
 sys.exit(1 if FAILED else 0)
