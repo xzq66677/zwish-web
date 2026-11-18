@@ -48,6 +48,11 @@ _DEFAULTS = {
         "local_recommend": 2,  # 本地模型（自由模式/精细润色）推荐次数
         "cloud_recommend": 4,  # 云端 / DS 通道推荐次数
     },
+    # ── 英文提示词契约 ────────────────────────────────────────
+    # prompt_en 是真正送进 ComfyUI 的生图词。开启后，若通道返回的
+    # prompt_en 缺失或含中文（实测元宝会这样），会带纠错指令重试一次，
+    # 仍失败则报错，绝不静默拿中文/旧词去生图。关闭则恢复旧的中文直通行为。
+    "enforce_english_prompt": True,
     # ── DeepSeek 网页自动化（DS · 网页）──────────────────────
     "ds_web_browser": "auto",           # auto=本机 Chrome/Edge 优先；可填 chrome/msedge/chromium/自定义exe路径
     "ds_web_chat_url": "https://chat.deepseek.com/",
