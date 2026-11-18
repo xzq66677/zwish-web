@@ -15,11 +15,13 @@ mockups/
 # ── DeepSeek 网页登录态（含 cookie，绝不入库）────────────
 ds_profile/
 
-# ── 图片：默认忽略生成图，但保留文档演示截图 ──────────────
+# ── 图片：默认忽略生成图，但保留文档演示截图与 AI 形象图标 ──
 *.png
 !docs/
 !docs/screenshots/
 !docs/screenshots/*.png
+!static/icons/
+!static/icons/*.png
 
 # ── Python ───────────────────────────────────────────────
 __pycache__/

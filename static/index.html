@@ -22,6 +22,10 @@
   .chip{background:transparent; border:1px solid var(--line2); border-radius:20px; padding:5px 15px;
         font-size:13px; cursor:pointer; color:var(--dim); white-space:nowrap}
   .chip.on{border-color:var(--acc); color:var(--acc); background:var(--acc-soft)}
+  .chip .wico{display:inline-flex; width:18px; height:18px; border-radius:5px; overflow:hidden;
+        vertical-align:-4px; margin-right:5px; align-items:center; justify-content:center;
+        font-size:12px; line-height:1; color:#fff; background:#888}
+  .chip .wico img{width:100%; height:100%; object-fit:cover; display:block}
   .dot{width:8px;height:8px;border-radius:50%;background:var(--ok); box-shadow:0 0 6px #788C5D66}
   .status{color:var(--dim); font-size:12px; display:flex; align-items:center; gap:7px; white-space:nowrap}
   header .sp{flex:1}
@@ -344,6 +348,13 @@
           <button class="btn mini" onclick="saveCleanup()">💾 保存清理设置</button>
         </div>
         <div class="chint">「删除聊天记录」尽力点击站点的「删除 / 新建对话」按钮；是否从账号历史彻底移除由各网站自身决定。</div>
+      </div>
+      <div class="cleanbox" id="styleBox">
+        <div class="ctitle">🎨 生图风格融入 <span style="font-weight:400;color:var(--dim)">（把所选 AI 的视觉气质写进生图提示词）</span></div>
+        <div class="crow">
+          <label class="sw"><input type="checkbox" id="ckStyle" onchange="toggleStyle(this.checked)"> 开启（仅对 AI 网页通道生效）</label>
+        </div>
+        <div class="chint">开启后，用「千问 / Grok / 元宝…」通道规划提示词时，会融入该 AI 的标志性视觉气质（如千问的国风雅致、Grok 的科幻极简）。本地通道不受影响。开关保存在本机浏览器。</div>
       </div>
       <div style="padding:10px 20px; border-bottom:1px solid var(--line); display:flex; gap:8px; align-items:center; flex-wrap:wrap">
         <span style="font-size:12px; color:var(--dim); white-space:nowrap">✨ 智能添加</span>
@@ -716,7 +727,7 @@ async function doPlan(feedback){
   const div = addWizard("👀 向导正在看图，准备追问…");
   try{
     const img = S.attach || S.lastImg || null;
-    const r = await api("/api/plan_questions", {wish:S.wish, current:S.promptCn || S.prompt,
+    const r = await api("/api/plan_questions", {wish:(S.wish||"") + styleHint(), current:S.promptCn || S.prompt,
       current_en:S.prompt, history: JSON.stringify(S.hist), feedback, img, model: modelParam(), count: askEffective()});
     const qs = r.questions || [];
     S.pendingFeedback = feedback; S.editQ = qs; S.selQ = [];
@@ -754,7 +765,7 @@ async function execPlan(skip){
   }
   const div = addWizard("📋 规划中…");
   try{
-    const r = await api("/api/plan", {wish:S.wish, current:S.promptCn || S.prompt, current_en:S.prompt,
+    const r = await api("/api/plan", {wish:(S.wish||"") + styleHint(), current:S.promptCn || S.prompt, current_en:S.prompt,
       history: JSON.stringify(S.hist), feedback: fbFull, img: S.attach || S.lastImg || null, model: modelParam()});
     const p = r.plan || r;
     if (p.action === "done"){ div.querySelector(".bubble").innerHTML = "好嘞，就到这儿～ 满意的话随时来许下一个愿 ✨"; setStage("wish","重新许愿…"); return; }
@@ -1186,7 +1197,11 @@ function renderWebChips(){
     el.className = "chip";
     el.id = "chipWeb_" + ch.id;
     el.dataset.webchip = "web:" + ch.id;
-    el.textContent = ch.name;
+    const [ic, icBg] = hubIcon(ch);
+    const isImg = typeof ic === "string" && /\.(png|svg|webp|jpg|jpeg)$/i.test(ic);
+    el.innerHTML = `<span class="wico" style="background:${esc(icBg)}">${isImg
+      ? `<img src="${esc(ic)}" alt="" onerror="this.parentNode.textContent='🌐'">`
+      : esc(ic)}</span>${esc(ch.name)}`;
     el.title = ch.ok ? (ch.name + "（已就绪）\n" + (ch.msg||""))
                      : (ch.name + " 未就绪：" + (ch.msg||""));
     el.onclick = () => setModel("web:" + ch.id);
@@ -1281,12 +1296,56 @@ const HUB_ICONS = {
   perplexity:["🔎","#20808d"], mistral:["🌬","#fa500f"], huggingchat:["🤗","#ffb100"],
   poe:["🦜","#5b53d6"]
 };
+// 各家 AI 的二创形象图标；图为网上公开的 AI 娘立绘裁剪（ ZipZipPipe 等作者，版权归原作者，仅作本地个人使用）
+// 图片放在 static/icons/，通过 /icons/<id>.png 访问；缺失的图片会自动回退到 HUB_ICONS 的 emoji
+const AI_ICON_ON = true;   // 形象图总开关：false 时全部回退 emoji
+const AI_ICONS = AI_ICON_ON ? {
+  qianwen:["/icons/qianwen.png","#6d5bd0"], deepseek:["/icons/deepseek.png","#4d6bfe"],
+  doubao:["/icons/doubao.png","#3ba3f5"], glm:["/icons/glm.png","#3a8fd6"],
+  kimi:["/icons/kimi.png","#22252b"], chatgpt:["/icons/chatgpt.png","#10a37f"],
+  gemini:["/icons/gemini.png","#4285f4"], claude:["/icons/claude.png","#d97757"],
+  grok:["/icons/grok.png","#1a1a1a"]
+} : {};
+// ── 生图风格融入：所选 AI 网页通道的视觉气质量表（纯文本提示，注入到规划请求）──
+const AI_STYLE = {
+  qianwen:"elegant Chinese guofeng aesthetic, ink-wash gradients, refined Oriental elegance",
+  deepseek:"clean minimalist tech aesthetic, deep blue tones, precise modern design",
+  yuanbao:"warm friendly aesthetic, soft blue and gold accents, polished and approachable",
+  doubao:"vivid playful aesthetic, bright cheerful colors, lively and cute",
+  yiyan:"nature-inspired Chinese aesthetic, soft jade and blue tones, poetic serenity",
+  glm:"professional modern aesthetic, clean geometric lines, trustworthy blue palette",
+  spark:"energetic warm aesthetic, radiant amber highlights, dynamic and inspiring",
+  kimi:"calm nocturnal aesthetic, deep indigo and moonlit tones, dreamy and refined",
+  chatgpt:"clean minimal aesthetic, balanced composition, natural refined lighting",
+  gemini:"futuristic cosmic aesthetic, iridescent pastel gradients, luminous and airy",
+  claude:"warm understated aesthetic, earthy terracotta tones, calm and thoughtful",
+  grok:"bold sci-fi minimalist aesthetic, deep black with electric cyan accents, edgy modern"
+};
+const STYLE_KEY = "zwishAiStyleOn";
+function styleOn(){ try{ return localStorage.getItem(STYLE_KEY) === "1"; }catch(e){ return false; } }
+function toggleStyle(on){
+  try{ localStorage.setItem(STYLE_KEY, on ? "1" : "0"); }catch(e){}
+  toast(on ? "🎨 生图风格融入已开启" : "生图风格融入已关闭");
+}
+// 若开关开启且当前是 AI 网页通道，返回该通道的风格提示（英文，追加到 wish）
+function styleHint(){
+  if (!styleOn() || !S.model || !S.model.startsWith("web:")) return "";
+  const id = S.model.slice(4);
+  const st = AI_STYLE[id];
+  return st ? `\n\n[Visual style guidance — weave this into prompt_en naturally: ${st}]` : "";
+}
 const HUB_PICK = ["🤖","🌟","🧠","🦄","🎨","🚀","💡","🔮","🦉","🐋","🌙","⚡","🎯","🌈","🪄","💎"];
 function hubIcon(p){
   let userIcon = null;
   try{ userIcon = (JSON.parse(localStorage.getItem("zwishHubIcons")||"{}"))[p.id]; }catch(e){}
   if (userIcon) return [userIcon, "#6d5bd0"];
-  if (p.icon) return [p.icon, "#6d5bd0"];
+  // icon 字段为图片路径（.png/.svg/...）时优先用内置形象图，其次 emoji
+  if (p.icon){
+    if (/\.(png|svg|webp|jpg|jpeg)$/i.test(p.icon)) return [p.icon, "#6d5bd0"];
+    return [p.icon, "#6d5bd0"];
+  }
+  const built = AI_ICONS[p.id];
+  if (built) return built;
   return HUB_ICONS[p.id] || ["🌐", "#888"];
 }
 // 自定义网站 = 已配置通道里、id 不在预设库中的项
@@ -1313,12 +1372,16 @@ function renderHub(){
       const on = S.model === "web:"+p.id;
       const state = ch ? (ch.ok ? "✓ 就绪" : "待登录") : "未添加";
       const [emoji, color] = hubIcon(p);
+      const isImg = typeof emoji === "string" && /\.(png|svg|webp|jpg|jpeg)$/i.test(emoji);
+      const logoHtml = isImg
+        ? `<span class="hlogo" style="background:${esc(color)}"><img src="${esc(emoji)}" alt="" onerror="this.parentNode.textContent='🌐'"></span>`
+        : `<span class="hlogo emoji" style="background:${esc(color)}">${esc(emoji)}</span>`;
       const ops = ch ? `<span class="hubops">
         <span title="打开登录窗口" onclick="event.stopPropagation();hubLogin('${esc(p.id)}')">🔑</span>
         <span title="检测输入框状态" onclick="event.stopPropagation();hubStatus('${esc(p.id)}')">🔍</span>
         <span title="移除此通道" onclick="event.stopPropagation();hubRemove('${esc(p.id)}')">🗑</span></span>` : "";
       return `<div class="hubitem ${on?"on":""}" onclick="pickPreset('${esc(p.id)}')">
-        <span class="hlogo emoji" style="background:${esc(color)}">${esc(emoji)}</span>
+        ${logoHtml}
         <span class="hname">${esc(p.name)}<small>${esc(p.url||"")}</small></span>
         <span class="hstate">${state}</span>${ops}</div>`;
     }).join("");
@@ -1404,9 +1467,25 @@ async function pickPreset(pid){
       selectors:{...webBlank().selectors, ...(c.selectors||{})}}));
     S.webChannels = cur.channels||[];
   }catch(e){ /* file:// 下会失败，由 api() 给出提示 */ }
-  // 已配置：直接切换过去
+  // 已配置：若处于禁用状态则自动启用并保存，再切换（确保顶部 chip 出现）
   const exist = (S.webEdit||[]).find(c=>c.id===pid);
   if (exist && exist.id){
+    if (exist.enabled === false){
+      exist.enabled = true;
+      try{
+        const r = await api("/api/save_webchat_channels", {channels:S.webEdit});
+        if (!r.ok) throw new Error(r.error||"启用失败");
+      }catch(e){ toast("启用通道失败："+e.message, true); return; }
+      toast("已启用「"+exist.name+"」");
+    }
+    // 重拉状态并重绘顶部 chip，使新启用的通道立即显示
+    try{
+      const c2 = await api("/api/webchat_channels");
+      S.webEdit = (c2.channels||[]).map(c=>({...webBlank(), ...c,
+        selectors:{...webBlank().selectors, ...(c.selectors||{})}}));
+      S.webChannels = (c2.channels||[]).filter(c=>c.enabled!==false);
+    }catch(e){ S.webChannels = S.webEdit.filter(c=>c.enabled!==false); }
+    renderWebChips();
     closeHub();
     setModel("web:"+pid, true);
     toast("已切换到「"+exist.name+"」");
@@ -1438,6 +1517,7 @@ async function loadWebChannelsUI(){
   const box = $("wbody");
   await loadWebPresets();
   loadCleanup();
+  if ($("ckStyle")) $("ckStyle").checked = styleOn();
   try{
     const r = await api("/api/webchat_channels");
     S.webEdit = (r.channels||[]).map(c=>({...webBlank(), ...c,
