@@ -91,6 +91,12 @@ def _with_channels(channels, browser_map, eval_fn, fn):
 
 
 def main():
+    # 与本机用户配置隔离：安装目录里可能存在真实的 webchat_channels.json，
+    # load_user_channels() 会优先读取它，从而覆盖下面基于 CFG 的打桩数据，
+    # 导致断言随用户配置漂移。测试内统一置空，保证结果确定。
+    _orig_load_user_channels = zwebchat.load_user_channels
+    zwebchat.load_user_channels = lambda: None
+
     print("[1] 配置校验（_channels）")
     base = zconfig.CFG.get("custom_web_channels")
     zconfig.CFG["custom_web_channels"] = [
@@ -259,6 +265,7 @@ def main():
     check("预设不含豆包", "豆包" not in chan_blob and "doubao" not in chan_blob)
 
     print(f"\n结果：{PASSED}/{PASSED + FAILED} 通过")
+    zwebchat.load_user_channels = _orig_load_user_channels
     return 0 if FAILED == 0 else 1
 
 
