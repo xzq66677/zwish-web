@@ -56,6 +56,75 @@ _DEFAULT_SELECTORS = {
 }
 
 _ID_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,31}$")
+
+# ── 自定义通道持久化（issue: 前端网页自配置）─────────────────────
+# 用户在网页「⚙️ 设置 → 🌐 网页通道」里增删改的通道列表存这里（已 gitignore），
+# 与 prompts.json / providers.json 同属"用户覆盖"文件，避免直接改写 config.json。
+# 读取优先级：webchat_channels.json > config.json 的 custom_web_channels。
+# 文件不存在/损坏时自动回退到 config.json，保证老用户零改动。
+CHANNELS_FILE = os.path.join(zconfig.HERE, "webchat_channels.json")
+
+
+def load_user_channels():
+    """读取用户自配置通道列表（原始 dict 列表）。文件不存在或损坏返回 None 表示"未配置"。"""
+    if not os.path.isfile(CHANNELS_FILE):
+        return None
+    try:
+        with open(CHANNELS_FILE, encoding="utf-8") as f:
+            data = json.load(f)
+        chs = data.get("channels") if isinstance(data, dict) else data
+        return chs if isinstance(chs, list) else None
+    except Exception as e:
+        print(f"[zwebchat] 警告：{CHANNELS_FILE} 读取失败（{e}），回退 config.json",
+              file=sys.stderr)
+        return None
+
+
+def save_user_channels(channels):
+    """校验并原子写入用户自配置通道列表。返回 (ok, msg, cleaned)。
+
+    cleaned 是规范化后的列表（只保留合法字段），供内存同步与前端回显。
+    """
+    if not isinstance(channels, list):
+        return False, "通道列表必须是数组", []
+    cleaned = []
+    seen = set()
+    for ch in channels:
+        if not isinstance(ch, dict):
+            continue
+        cid = str(ch.get("id") or "").strip()
+        if not _ID_RE.match(cid):
+            return False, f"非法通道 id：{cid!r}（需小写字母/数字/-/_，≤32 字符）", []
+        if cid in seen:
+            return False, f"通道 id 重复：{cid}", []
+        seen.add(cid)
+        url = str(ch.get("url") or "").strip()
+        if not url.startswith(("http://", "https://")):
+            return False, f"通道 {cid} 的 url 非法（需 http:// 或 https://）", []
+        sels = ch.get("selectors") or {}
+        if not isinstance(sels, dict):
+            return False, f"通道 {cid} 的 selectors 必须是对象", []
+        cleaned.append({
+            "id": cid,
+            "name": str(ch.get("name") or cid).strip() or cid,
+            "enabled": ch.get("enabled") is not False,  # 默认启用
+            "url": url,
+            "browser": str(ch.get("browser") or "auto").strip() or "auto",
+            "headless": bool(ch.get("headless", False)),
+            "profile": str(ch.get("profile") or "").strip(),
+            "selectors": {k: (v if isinstance(v, list) else [])
+                          for k, v in sels.items() if k in _DEFAULT_SELECTORS},
+        })
+    try:
+        tmp = CHANNELS_FILE + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump({"channels": cleaned}, f, ensure_ascii=False, indent=2)
+        os.replace(tmp, CHANNELS_FILE)
+    except Exception as e:
+        return False, f"写入失败：{e}", []
+    return True, f"已保存 {len(cleaned)} 个通道", cleaned
+
+
 _LOGIN_TEXT_JS = """(function(){
   var t=((document.body&&document.body.innerText)||'').toLowerCase();
   return t.indexOf('登录')>=0 || t.indexOf('扫码')>=0 || t.indexOf('二维码')>=0 ||
@@ -64,9 +133,15 @@ _LOGIN_TEXT_JS = """(function(){
 
 
 def _channels():
-    """读取并校验 custom_web_channels 配置，返回 enabled 通道列表。"""
+    """读取并校验通道配置，返回 enabled 通道列表。
+
+    优先读网页自配置的 webchat_channels.json；未配置时回退 config.json 的
+    custom_web_channels，兼容 #23 的手动配置方式。
+    """
+    user = load_user_channels()
+    raw = user if user is not None else (CFG.get("custom_web_channels") or [])
     out = []
-    for ch in CFG.get("custom_web_channels") or []:
+    for ch in raw:
         if not isinstance(ch, dict):
             continue
         if ch.get("enabled") is False:
@@ -126,6 +201,40 @@ def available(cid):
         return False, str(e)
     return True, (f"{ch['name']} CDP 通道就绪 · 浏览器：{desc}"
                   "（独立 profile，首次需登录一次；文字会发送到该网站）")
+
+
+def list_all():
+    """供设置面板编辑：返回全部通道（含 disabled），附带可用性状态。
+
+    数据源与 _channels() 一致（用户配置文件优先，回退 config.json），
+    但不剔除 disabled 项——前端需要展示并让用户重新启用。
+    """
+    user = load_user_channels()
+    raw = user if user is not None else (CFG.get("custom_web_channels") or [])
+    out = []
+    for ch in raw:
+        if not isinstance(ch, dict):
+            continue
+        cid = str(ch.get("id") or "").strip()
+        if not _ID_RE.match(cid):
+            continue
+        url = str(ch.get("url") or "").strip()
+        if not url.startswith(("http://", "https://")):
+            continue
+        ok, msg = available(cid)
+        out.append({
+            "id": cid,
+            "name": str(ch.get("name") or cid),
+            "enabled": ch.get("enabled") is not False,
+            "url": url,
+            "browser": ch.get("browser") or "auto",
+            "headless": bool(ch.get("headless", False)),
+            "profile": str(ch.get("profile") or "").strip(),
+            "selectors": ch.get("selectors") or {},
+            "ok": ok,
+            "msg": msg,
+        })
+    return out
 
 
 def list_enabled_status():

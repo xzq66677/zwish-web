@@ -268,6 +268,7 @@
     <div class="hhead"><b>⚙️ 设置</b><span class="x" onclick="closeSettings()">✕</span></div>
     <div class="settabs">
       <span class="tab on" id="tabProv" onclick="setSetTab('prov')">☁️ 云端供应商</span>
+      <span class="tab" id="tabWeb" onclick="setSetTab('web')">🌐 网页通道</span>
       <span class="tab" id="tabPrompt" onclick="setSetTab('prompt')">📝 内置提示词</span>
     </div>
     <div id="viewProv" style="display:flex; flex-direction:column; flex:1; min-height:0">
@@ -281,6 +282,18 @@
         <button class="btn" onclick="presetDeepSeek()">⚡ 一键预置 DeepSeek</button>
         <button class="btn" onclick="addProv()">➕ 新供应商</button>
         <button class="btn primary" style="flex:1" onclick="saveSettings()">💾 保存</button>
+      </div>
+    </div>
+    <div id="viewWeb" style="display:none; flex-direction:column; flex:1; min-height:0">
+      <div style="padding:12px 20px 0; font-size:12px; color:var(--dim); line-height:1.7">
+        声明任意 AI 对话网站（千问 / Grok / 文心一言 / Kimi…），像内置通道一样用于追问 / 精修。
+        <b>每个通道独立登录态，需首次在弹出窗口登录一次</b>；文字会发到该网站，<b>图片与看图点评仍走本地</b>。
+        不自动登录、不绕过平台限额。选择器可按报错里的 DOM 诊断调整。
+      </div>
+      <div class="sbody" id="wbody"><div class="hempty">加载中…</div></div>
+      <div style="padding:14px 20px; border-top:1px solid var(--line); display:flex; gap:10px; flex-wrap:wrap">
+        <button class="btn" onclick="addWebChannel()">➕ 新网页通道</button>
+        <button class="btn primary" style="flex:1" onclick="saveWebChannels()">💾 保存网页通道</button>
       </div>
     </div>
     <div id="viewPrompt" style="display:none; flex-direction:column; flex:1; min-height:0">
@@ -305,7 +318,7 @@
 const S = { model:"auto", stage:"wish", wish:"", qa:"", answers:[], questions:[], sel:[],
             prompt:null, promptCn:null, w:1024, h:1024, lastImg:null, attach:null, hist:[], seed:null,
             params:{ w:1024, h:1024, den:0.55, denLock:false, steps:8, grow:12, threshold:0.5, seed:null, batch:1 },
-            provs:[], cloudSel:null, dsWebOk:false, dsWebMsg:"", ybOk:false, ybMsg:"", webChannels:[], visionModel:"gemma3:4b", comfyPort:8188,
+            provs:[], cloudSel:null, dsWebOk:false, dsWebMsg:"", ybOk:false, ybMsg:"", webChannels:[], webEdit:[], webSource:"config", visionModel:"gemma3:4b", comfyPort:8188,
             askCfg:null, askCount:2, askMode:"follow" };
 const $ = id => document.getElementById(id);
 const chat = $("chat"), inp = $("inp");
@@ -877,12 +890,14 @@ refreshCloudSel();
 function openSettings(){ setSetTab("prov"); loadProvidersUI(); $("setp").classList.add("on"); }
 function closeSettings(){ $("setp").classList.remove("on"); }
 function setSetTab(which){
-  const isProv = which === "prov";
-  $("tabProv").classList.toggle("on", isProv);
-  $("tabPrompt").classList.toggle("on", !isProv);
-  $("viewProv").style.display = isProv ? "flex" : "none";
-  $("viewPrompt").style.display = isProv ? "none" : "flex";
-  if (!isProv) loadPromptsUI();
+  const map = {prov:["tabProv","viewProv"], web:["tabWeb","viewWeb"], prompt:["tabPrompt","viewPrompt"]};
+  Object.entries(map).forEach(([k,[tab,view]]) => {
+    $(tab).classList.toggle("on", k===which);
+    $(view).style.display = k===which ? "flex" : "none";
+  });
+  if (which==="prov") loadProvidersUI();
+  else if (which==="web") loadWebChannelsUI();
+  else loadPromptsUI();
 }
 
 /* ── 内置提示词自定义 ── */
@@ -1050,9 +1065,20 @@ refreshGallery();
     : ("元宝网页通道未就绪：" + (S.ybMsg || "未检测到本机浏览器"));
   // 自定义 AI 网页通道（issue #23）：动态渲染顶部 chips
   S.webChannels = c.custom_channels || [];
+  renderWebChips();
+  if (!c.ready) addErr("ComfyUI 路径未配置：请把 config.example.json 复制为 config.json 并填写 base_dir（生图会失败）");
+}catch(e){} })();
+
+/* ── 自定义网页通道：前端自配置（设置面板 🌐 网页通道）── */
+const WEB_SEL_KEYS = ["composer","send","answer","generating"];
+function webBlank(){
+  return {id:"", name:"", url:"", enabled:true, browser:"auto", headless:false,
+          profile:"", selectors:{composer:[],send:[],answer:[],generating:[]}};
+}
+function renderWebChips(){
+  document.querySelectorAll("[data-webchip]").forEach(el=>el.remove());
   const histChip = document.querySelector('.chip[onclick="openHistory()"]');
   (S.webChannels||[]).forEach(ch => {
-    if (document.getElementById("chipWeb_" + ch.id)) return;
     const el = document.createElement("span");
     el.className = "chip";
     el.id = "chipWeb_" + ch.id;
@@ -1064,8 +1090,105 @@ refreshGallery();
     if (histChip) histChip.parentElement.insertBefore(el, histChip);
     else document.querySelector("header").appendChild(el);
   });
-  if (!c.ready) addErr("ComfyUI 路径未配置：请把 config.example.json 复制为 config.json 并填写 base_dir（生图会失败）");
-}catch(e){} })();
+}
+async function loadWebChannelsUI(){
+  const box = $("wbody");
+  try{
+    const r = await api("/api/webchat_channels");
+    S.webEdit = (r.channels||[]).map(c=>({...webBlank(), ...c,
+      selectors:{...webBlank().selectors, ...(c.selectors||{})}}));
+    S.webSource = r.source || "config";
+  }catch(e){ S.webEdit=[]; S.webSource="config"; }
+  renderWebChannels();
+}
+function renderWebChannels(){
+  const el = $("wbody");
+  const list = S.webEdit || [];
+  if (!list.length){
+    el.innerHTML = '<div class="hempty">还没有网页通道。点下方「➕ 新网页通道」添加一个，或从 config.json 的 custom_web_channels 导入。</div>';
+    return;
+  }
+  el.innerHTML = list.map((c,i)=>{
+    const sel = c.selectors||{};
+    const selRow = k => `<div style="display:flex;gap:6px;align-items:center;margin:4px 0">
+      <label style="width:76px;color:var(--dim);font-size:11px">${k}</label>
+      <input data-wsel="${k}" data-i="${i}" value="${esc((sel[k]||[]).join(', '))}"
+             placeholder="逗号分隔的 CSS 选择器"></div>`;
+    return `<div class="prov" style="margin-bottom:12px" data-wi="${i}">
+      <div class="prow"><label>名称</label>
+        <input data-wf="name" data-i="${i}" value="${esc(c.name||"")}" placeholder="千问 · 网页">
+        <label class="sw"><input type="checkbox" data-wf="enabled" data-i="${i}" ${c.enabled!==false?"checked":""}> 启用</label>
+        <span class="mini" style="width:auto" onclick="delWebChannel(${i})">🗑 删除</span></div>
+      <div class="prow"><label>ID</label>
+        <input data-wf="id" data-i="${i}" value="${esc(c.id||"")}" placeholder="qianwen（小写字母/数字/-/_）"></div>
+      <div class="prow"><label>网址</label>
+        <input data-wf="url" data-i="${i}" value="${esc(c.url||"")}" placeholder="https://…"></div>
+      <div class="prow"><label>浏览器</label>
+        <input data-wf="browser" data-i="${i}" value="${esc(c.browser||"auto")}" placeholder="auto">
+        <label class="sw"><input type="checkbox" data-wf="headless" data-i="${i}" ${c.headless?"checked":""}> 无头</label>
+        <span class="mini" style="width:auto" onclick="webLogin(${i})">🔑 打开登录</span>
+        <span class="mini" style="width:auto" onclick="webStatus(${i})">🔍 检测状态</span></div>
+      <div class="prow"><label>选择器</label><span class="tres" id="wst${i}"></span></div>
+      <div style="padding:2px 0 6px">${WEB_SEL_KEYS.map(selRow).join("")}</div>
+    </div>`;
+  }).join("");
+  el.querySelectorAll("[data-wf],[data-wsel]").forEach(inp=>{
+    inp.oninput = ()=>collectWeb(inp);
+    inp.onchange = ()=>collectWeb(inp);
+  });
+}
+function collectWeb(inp){
+  const i = +inp.dataset.i, c = S.webEdit[i];
+  if (!c) return;
+  if (inp.dataset.wf){
+    const f = inp.dataset.wf;
+    c[f] = (f==="enabled"||f==="headless") ? inp.checked : inp.value;
+  } else if (inp.dataset.wsel){
+    const k = inp.dataset.wsel;
+    c.selectors[k] = inp.value.split(/[,，]/).map(s=>s.trim()).filter(Boolean);
+  }
+}
+function addWebChannel(){ collectAllWeb(); S.webEdit.push(webBlank()); renderWebChannels(); }
+function delWebChannel(i){ collectAllWeb(); S.webEdit.splice(i,1); renderWebChannels(); }
+function collectAllWeb(){ document.querySelectorAll("#wbody [data-wf],#wbody [data-wsel]").forEach(inp=>collectWeb(inp)); }
+async function saveWebChannels(){
+  collectAllWeb();
+  try{
+    const r = await api("/api/save_webchat_channels", {channels:S.webEdit});
+    if (!r.ok) throw new Error(r.error||"保存失败");
+    S.webEdit = (r.channels||[]).map(c=>({...webBlank(), ...c,
+      selectors:{...webBlank().selectors, ...(c.selectors||{})}}));
+    S.webSource = "user";
+    renderWebChannels();
+    // 刷新顶部 chip：拉最新 config 的 enable 通道状态
+    const cfg = await api("/api/config");
+    S.webChannels = cfg.custom_channels||[];
+    renderWebChips();
+    addWizard("💾 网页通道已保存，顶部已更新（如新增通道请在该窗口首次登录）");
+  }catch(e){ addErr("保存网页通道失败："+e.message); }
+}
+async function webLogin(i){
+  collectAllWeb();
+  const c = S.webEdit[i];
+  if (!c.id){ addErr("请先填写通道 ID 再登录"); return; }
+  try{
+    const r = await api("/api/webchat_login", {id:c.id});
+    addWizard(r.ok ? (r.msg||"已打开登录窗口") : ("登录失败："+(r.error||"")));
+  }catch(e){ addErr("打开登录窗口失败："+e.message); }
+}
+async function webStatus(i){
+  collectAllWeb();
+  const c = S.webEdit[i];
+  if (!c.id){ addErr("请先填写通道 ID"); return; }
+  const el = $("wst"+i);
+  if (el) el.textContent = "检测中…";
+  try{
+    const r = await api("/api/webchat_status", {id:c.id});
+    const txt = r.error ? ("❌ "+r.error)
+      : `${r.hasComposer?"✅ 输入框就绪":"⚠ 未找到输入框"} · ${r.title||""}`;
+    if (el) el.textContent = txt;
+  }catch(e){ if (el) el.textContent = "❌ "+e.message; }
+}
 
 </script>
 </body>

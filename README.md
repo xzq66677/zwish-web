@@ -36,7 +36,6 @@
   | DS · 网页  | CDP 控制本机浏览器访问 `chat.deepseek.com`，**零额外依赖 + 内置提示词** | 是（需登录一次）     |
   | 元宝 · 网页 | CDP 控制本机浏览器访问 `yuanbao.tencent.com`，**独立 profile + 内置提示词**（备用通道） | 是（需登录一次）     |
   | ☁️ 云端    | 设置面板里任意 OpenAI/Anthropic 兼容供应商                      | 是            |
-  | 自定义网页 | config.json 声明任意 AI 对话网站（千问 / Grok / 文心一言…），独立 profile + 可配置选择器 | 是（需登录一次） |
 - **生图三模式**：文生图 / img2img 整图改 / SAM 3 自动蒙版局部重绘
 - **看图点评**：本地视觉模型看着图给建议，一键应用
 - **历史记录**：提示词 / 参数 / 种子 / 耗时落盘，可载入继续改、复制、删除
@@ -159,34 +158,19 @@ DeepSeek 网页额度用尽时，可手动切换到腾讯元宝网页通道（Is
 
 > 与 DS·网页共用 `zds._WEB_LOCK`，两条网页通道串行执行，不会同时操作同一个浏览器。使用前请自行确认腾讯元宝的数据政策与使用条款。
 
-### 自定义 AI 网页通道（配置驱动，无需改代码）
+### 自定义网页通道（网页自配置，无需改代码）
 
-DS / 元宝之外，可在 `config.json` 的 `custom_web_channels` 里声明任意 AI 对话网站（千问、Grok、文心一言、Kimi 等）作为润色通道。`config.example.json` 附带千问 / Grok / 文心一言三个示例，**默认关闭**且预置不含豆包——需要豆包时按同格式自行添加。
+千问 / Grok / 文心一言 / Kimi 等任意 AI 对话网站，都能作为润色通道使用，且**全程在网页里配置，不用手改 JSON**：
 
-```json
-"custom_web_channels": [
-  {
-    "id": "qianwen",
-    "name": "千问 · 网页",
-    "enabled": true,
-    "url": "https://tongyi.aliyun.com/qianwen/",
-    "browser": "auto",
-    "headless": false,
-    "selectors": {
-      "composer": ["textarea", "[contenteditable=\"true\"]"],
-      "send": ["button[aria-label*=\"发送\"]", "div[role=\"button\"]:has-text(\"发送\")"],
-      "answer": ["[class*=\"markdown\"]", "[class*=\"answer-item\"]"],
-      "generating": ["[class*=\"stop\"]"]
-    }
-  }
-]
-```
+1. 打开 **⚙️ 设置 → 🌐 网页通道**，点「➕ 新网页通道」。
+2. 填 **名称 / ID**（小写字母数字、`-`、`_`）/ **网址**；ID 决定独立登录目录 `data/webchat_<id>_profile`。
+3. 点「🔑 打开登录」→ 在程序弹出的浏览器窗口登录一次（登录态独立、自动复用）。
+4. 点「🔍 检测状态」确认输入框就绪；若页面改版定位失败，按报错里的 DOM 诊断调整 `composer / send / answer / generating` 选择器（逗号分隔）。
+5. 点「💾 保存网页通道」→ 顶部立即出现该通道 chip，选中即可用于追问 / 精修 / 重写 / 微调规划。
 
-- `enabled: true` 后顶部自动出现对应标签；首次使用弹出浏览器，请在**程序弹出的窗口**里登录一次（登录态存 `data/webchat_<id>_profile`，之后自动复用）。
-- `profile` 字段（可选）可指向已有 profile 目录复用登录态——需确保对应官方通道的浏览器未在运行。
-- 选择器为通用兜底值，各站改版后请按报错里的 **DOM 诊断**（候选节点数 / 页面文本长度）调整；也可用 `POST /api/webchat_status {"id":...}` 探测登录态与页面结构。
-- 相关接口：`POST /api/webchat_login {"id":...}` 打开登录窗口；`GET /api/config` 返回各通道 `ok` 状态。
-- 所有自定义通道与 DS / 元宝共用会话锁，串行执行；英文提示词契约（`enforce_english_prompt`）同样生效。
+- 配置保存在 `webchat_channels.json`（已 gitignore），优先级高于 `config.json` 的 `custom_web_channels`；没有该文件时自动沿用旧的手工配置，零迁移成本。
+- 每个通道独立 profile、独立登录态，与其他通道及日常浏览器互不影响；看图 / 点评仍走本地视觉模型，图片不上传。
+- 不自动登录、不轮换账号、不绕过任何平台限额；是否使用完全由你手动选择。使用前请自行确认目标网站的数据政策与使用条款。
 
 ### 自定义内置提示词（DS 网页 / API / 云端共用）
 
@@ -240,33 +224,15 @@ DS / 元宝之外，可在 `config.json` 的 `custom_web_channels` 里声明任�
 
 ## 变更记录
 
-### 2026-11-18 · Origin 端口精确比对（#20）
+### 2026-11-18 · 网页通道泛化与前端自配置
 
-`_same_origin()` 原先只比对回环主机不比对端口——本机其他端口的页面（如 `127.0.0.1:3000` 的开发服务器）也能向 `127.0.0.1:8189` 发起状态变更（`/api/save_providers`、`/api/delete` 等）。修复后 Origin 的 **host 和端口必须与请求 Host 完全一致**（Host 缺端口对齐服务监听端口，Origin 缺端口按 scheme 默认端口，IPv6 字面量支持，非法端口直接拒绝）。真实浏览器同源访问不受影响（Origin 恒等于页面源）。回归 `tests/test_origin_port.py`（18 项）。
+本日先把网页自动化从写死两条通道泛化为配置驱动，再把配置能力搬进网页，全程无需手改 JSON。全仓回归 **241/241 通过**（13 个测试文件）。
 
----
-
-### 2026-11-18 · 自定义 AI 网页通道（custom_web_channels）
-
-**#23 — 配置驱动的通用网页自动化**：DS / 元宝之外，可在 `config.json` 的 `custom_web_channels` 声明任意 AI 对话网站（千问、Grok、文心一言、Kimi…）作为润色通道。`config.example.json` 附带三个示例（**默认关闭**，预置不含豆包）。每通道独立 profile 与登录态（默认 `data/webchat_<id>_profile`，可用 `profile` 字段复用）；填充自适应 textarea / contenteditable，发送支持 aria-disabled 等待与 Enter 兜底；报错带 DOM 诊断（候选节点数 / 页面文本长度），网页改版只需调选择器。新增接口：`/api/config` 的 `custom_channels` 状态、`POST /api/webchat_login`、`POST /api/webchat_status`。所有自定义通道与 DS / 元宝共用会话锁串行执行，并注入通道契约（禁承诺生图、`prompt_en` English only），英文契约由 `zwish._guarded_parse` 统一兜底。
-
-**真机引擎验证**：以一条临时自定义通道（指向已登录元宝 profile + 已验证选择器）端到端跑通真实对话，返回正常。回归 `tests/test_webchat_channels.py`（29 项），全仓 191/191 通过。
-
----
-
-### 2026-11-18 · 英文提示词契约（enforce_english_prompt）
-
-**真机实测发现**：元宝通道对"改成手绘线稿风"这类修改反馈，会返回合法 JSON 但把 `prompt_en` 写成整段中文（如"基于输入图进行风格重绘：保留猫娘少女…"），完全无视模板里的 English 要求；系统随后拿中文词直接重画——用户看到的是"没给提示词，直接重新生图"。另有一条路径：修改请求被回答成对话式"帮你重新生成"，`action=regenerate` 且不带新提示词，同样按旧词重画。
-
-**修复（三层）**：
-
-- **模板加固**（`zprompts.py`）：`plan` 模板明确 `regenerate` 仅限"用户只想再随机来一张且未提修改点"；用户提出任何具体修改点时禁止 regenerate；`prompt_en` 标注"必须纯英文"；`img2img` 不输出 segment。
-- **运行时守卫**（`zwish.py`）：新增 `_en_violation` / `_retry_english` / `_guarded_parse`。精修、重写、微调规划三条链路中，`prompt_en` 缺失或含中文时自动带纠错指令重试一次；仍失败则抛出明确错误，**绝不静默拿中文/旧词生图**。`action=regenerate` 不带新提示词视为合法重掷（前端自动沿用当前英文词换种子），不误伤。可用 `config.json` 的 `enforce_english_prompt: false` 关闭（恢复旧的中文直通行为，照顾只会输出中文的本地模型）。
-- **通道硬约束**（`zyuanbao.py`）：每条消息前置通道契约（纯文本通道身份、禁止承诺生成图片、`prompt_en` 必须 English only、修改点禁止 regenerate），并在消息末尾重复强调——对弱指令跟随的网页模型更有效。
-
-**回归**：`tests/test_prompt_enforcement.py`（26 项：中文纠正、重试耗尽报错、合法重掷不误伤、开关关闭回退、契约注入、模板加固），全仓 152/152 通过。
-
----
+- **#23 / #24 — 自定义 AI 网页通道**：新增 `zwebchat.py` 通用引擎，复用 `zds` 的 CDP 基础设施与两把锁；在 `config.json` 的 `custom_web_channels` 声明任意 AI 对话网站即可作为润色通道，独立 profile、选择器可配置、错误带 DOM 诊断。预置千问 / Grok / 文心一言（默认关闭，不含豆包）。`/api/config` 返回 `custom_channels`，顶部动态渲染通道 chip。
+- **#21 / #22 — 英文提示词契约**：网页通道中文 `prompt_en` 被纠正为英文契约（`_guarded_parse` 运行时守卫 + 通道契约注入），修复"修改请求被降级为按旧词重画"。
+- **#20 / #25 — Origin 端口校验**：来源校验从"只比对回环主机"收紧为"主机 + 端口精确比对"，本机其他端口页面不再能发起跨端口状态变更。
+- **#17 / #18 / #19 — 测试入口健壮性**：修复 GBK 控制台父进程解码子进程 UTF-8 输出失败、断言统计漏计 `test_ui_prompt_actions` 的 10 项。
+- **本轮 — 网页通道前端自配置**：设置面板新增「🌐 网页通道」tab，可视化增删改通道（名称 / ID / 网址 / 启用 / 浏览器 / 选择器），一键登录与状态探测，保存后顶部 chip 即时刷新。配置落到 `webchat_channels.json`（已 gitignore），优先级高于 `config.json` 手工配置，无该文件时自动回退——老用户零迁移。新增 `GET/POST /api/webchat_channels`、`/api/save_webchat_channels` 接口。回归 `tests/test_webchat_config_ui.py`（32 项）及端到端 HTTP 实测。
 
 ### 2026-11-16 · 本机请求代理与启动器修复
 
@@ -302,17 +268,9 @@ DS / 元宝之外，可在 `config.json` 的 `custom_web_channels` 里声明任�
 
 ### 2026-11-17 · 元宝网页备用通道与 Windows 测试入口修复
 
-**#14 / PR #16 — 新增「元宝 · 网页」备用通道**：DeepSeek 网页额度用尽时的手动备用通道（用户主动选择，不自动轮换账号、不绕过任何限额）。复用 `zds.py` 的 CDP 基础设施（浏览器探测 / WebSocket / helper 注入 / 两把锁），独立 `data/yuanbao_profile` 登录态与选择器；文字提示词发往腾讯元宝，图片与看图点评仍走本地。新增 `zyuanbao.py`、`/api/yuanbao_login`、前端标签与路由、`config.example.json` 配置项，回归 `tests/test_yuanbao_web.py`（25 项：profile 隔离、锁复用、会话清理、Quill 填充、发送状态、桩浏览器复用与无标签泄漏）。合并后已实证全仓 136/136 通过（统一入口统计，不含元测试）。
+**#14 / PR #16 — 新增「元宝 · 网页」备用通道**：DeepSeek 网页额度用尽时的手动备用通道（用户主动选择，不自动轮换账号、不绕过任何限额）。复用 `zds.py` 的 CDP 基础设施（浏览器探测 / WebSocket / helper 注入 / 两把锁），独立 `data/yuanbao_profile` 登录态与选择器；文字提示词发往腾讯元宝，图片与看图点评仍走本地。新增 `zyuanbao.py`、`/api/yuanbao_login`、前端标签与路由、`config.example.json` 配置项，回归 `tests/test_yuanbao_web.py`（25 项：profile 隔离、锁复用、会话清理、Quill 填充、发送状态、桩浏览器复用与无标签泄漏）。合并后已实证全仓 143/143 通过。
 
-**#15 — 统一测试入口在 Windows 默认控制台崩溃**：`tests/run_all.py` 原先打印 `▶` / `✓`，在 GBK(cp936) 控制台抛 `UnicodeEncodeError`。修复用三重保险：输出前缀改 ASCII（`>` / `[OK]`）、stdout/stderr 强制 UTF-8 + `errors=replace`、子进程固定 `PYTHONIOENCODING=utf-8`；并让入口跳过会反向调用自身的元测试以避免递归。回归 `tests/test_run_all_windows.py`。
-
----
-
-### 2026-11-18 · 测试入口 GBK 解码与统计口径修复
-
-**#17 — GBK 控制台仍失败（解码方向不一致）**：上一轮只把子进程输出固定为 UTF-8，父进程 `subprocess.run(..., text=True)` 仍按 cp936 解码，读取线程抛 `UnicodeDecodeError`，断言统计变成 `0/0`。修复：入口显式 `encoding="utf-8", errors="replace"`；`test_security_fixes.py` 的嵌套子进程同时固定 `PYTHONIOENCODING=utf-8`；元测试与相关测试的输出改用 ASCII 标记，保证单文件也能在 GBK 控制台独立运行。
-
-**#18 — 断言统计漏计**：`test_ui_prompt_actions.py` 的汇总行格式不同（`结果: x 通过 / y 失败`），被入口解析器静默跳过（漏计 10 项）。修复：统一为 `结果：x/y 通过`；元测试新增“汇总行格式一致”和“总断言数等于各文件之和”两条断言，防止再次漂移。修正后统一入口在 GBK 默认环境为 `136/136` 通过。
+**#15 — 统一测试入口在 Windows 默认控制台崩溃**：`tests/run_all.py` 原先打印 `▶` / `✓`，在 GBK(cp936) 控制台抛 `UnicodeEncodeError`。修复用三重保险：输出前缀改 ASCII（`>` / `[OK]`）、stdout/stderr 强制 UTF-8 + `errors=replace`、子进程固定 `PYTHONIOENCODING=utf-8`；并让入口跳过会反向调用自身的元测试以避免递归。回归 `tests/test_run_all_windows.py`（7 项，含 GBK 环境实证退出码 0）。
 
 ---
 
