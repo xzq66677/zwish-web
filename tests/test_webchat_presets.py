@@ -115,6 +115,26 @@ check("智能添加不再往聊天区刷屏",
       'toast("已添加「"+p.name+"」' in html
       and 'addWizard("已智能填充' not in html)
 
+# 自定义网站 + 小图标 + 操作按钮（issue #29）
+for fn in ("hubIcon", "customChannels", "hubLogin", "hubStatus", "hubRemove",
+           "openHubForm", "closeHubForm", "hubPickIcon", "saveCustomSite"):
+    check(f"前端有 {fn}()", f"function {fn}(" in html)
+check("预设有 AI 风格图标映射", "const HUB_ICONS = {" in html
+      and "chatgpt:[" in html and "gemini:[" in html)
+check("图标选择器存在", 'id="hfIcons"' in html and "HUB_PICK" in html)
+check("自定义网站表单存在", 'id="hubform"' in html and 'id="hfName"' in html
+      and 'id="hfUrl"' in html)
+check("添加自定义网站入口", "openHubForm()" in html and "saveCustomSite()" in html)
+check("每个卡片有登录/检测/删除按钮",
+      "hubLogin('${" in html and "hubStatus('${" in html and "hubRemove('${" in html
+      and "event.stopPropagation()" in html)
+check("自定义网站分组", "我的自定义网站" in html)
+check("图标走 localStorage 兜底", "zwishHubIcons" in html)
+# 后端保留 icon 字段
+zw = open(os.path.join(HERE, "zwebchat.py"), encoding="utf-8").read()
+check("后端 save 保留 icon", '"icon": str(ch.get("icon")' in zw)
+check("后端 _channels/list_all 透传 icon", zw.count('"icon": str(ch.get("icon")') >= 3)
+
 # 前端内嵌预设（关键：单文件更新 / 后端接口缺失时仍可用，修复实测"找不到 gemini"）
 check("前端内嵌 BUILTIN_PRESETS 常量", "const BUILTIN_PRESETS = [" in html)
 check("loadWebPresets 以内嵌为准", "BUILTIN_PRESETS.slice()" in html

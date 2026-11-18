@@ -144,6 +144,23 @@
   .hubitem .hname{flex:1; font-size:13px}
   .hubitem .hname small{display:block; color:var(--dim); font-size:11px; margin-top:1px}
   .hubitem .hstate{font-size:11px; color:var(--dim); white-space:nowrap}
+  .hubitem .hlogo.emoji{font-size:15px}
+  .hubops{display:flex; gap:3px; margin-left:4px}
+  .hubops span{width:24px; height:24px; display:flex; align-items:center; justify-content:center;
+        border-radius:6px; font-size:12px; cursor:pointer; opacity:.55; transition:all .15s}
+  .hubops span:hover{opacity:1; background:var(--line2)}
+  .hubadd{display:flex; align-items:center; gap:8px; margin-top:16px; padding:11px 14px; cursor:pointer;
+        border:1px dashed var(--line2); border-radius:10px; color:var(--dim); font-size:13px}
+  .hubadd:hover{border-color:var(--acc); color:var(--acc)}
+  .hubform{padding:14px 20px; border-top:1px solid var(--line); display:none; flex-direction:column; gap:9px}
+  .hubform.on{display:flex}
+  .hubform input{width:100%}
+  .hubform .row{display:flex; gap:8px; align-items:center}
+  .hubform label{font-size:12px; color:var(--dim); width:52px; flex:0 0 52px}
+  .iconpick{display:flex; gap:5px; flex-wrap:wrap; flex:1}
+  .iconpick span{width:30px; height:30px; display:flex; align-items:center; justify-content:center;
+        border:1px solid var(--line2); border-radius:8px; cursor:pointer; font-size:15px}
+  .iconpick span.sel{border-color:var(--acc); background:var(--acc-soft)}
   /* 轻量 toast：替代刷屏的向导气泡 */
   #toast{position:fixed; left:50%; bottom:28px; transform:translateX(-50%) translateY(20px); z-index:200;
          background:#2a2825; color:#fff; padding:10px 18px; border-radius:9px; font-size:13px;
@@ -345,6 +362,18 @@
       点选即自动配置并切换为润色通道，首次用请按提示在弹出的窗口登录一次。文字发到该网站，图片仍走本地。
     </div>
     <div class="hubgrid" id="hublist"><div class="hempty">加载中…</div></div>
+    <div class="hubform" id="hubform">
+      <div class="row"><label>名称</label><input id="hfName" placeholder="如：我的 AI 网站"></div>
+      <div class="row"><label>网址</label><input id="hfUrl" placeholder="https://…"></div>
+      <div class="row" style="align-items:flex-start"><label style="padding-top:6px">图标</label>
+        <div class="iconpick" id="hfIcons"></div></div>
+      <div class="row" style="justify-content:flex-end; gap:8px; margin-top:2px">
+        <span class="mini" style="width:auto" onclick="closeHubForm()">取消</span>
+        <button class="btn primary" onclick="saveCustomSite()">添加</button></div>
+    </div>
+    <div style="padding:0 20px 16px">
+      <div class="hubadd" onclick="openHubForm()">➕ 添加自定义网站（填网址即可，图标可选）</div>
+    </div>
   </div>
 
   <div id="toast"></div>
@@ -1222,40 +1251,140 @@ function smartFill(i){
   toast("已按「"+p.name+"」补全："+filled.join("、"));
 }
 // ── 顶部一键入口：预设网站选择面板（issue #28）─────────────────────
+// ── 顶部一键入口：预设网站 + 自定义网站 + 小图标 + 操作按钮（issue #29）──
 const HUB_CN = ["qianwen","deepseek","yuanbao","doubao","yiyan","glm","spark","kimi",
                 "metaso","minimax","step","baichuan","tiangong","sensetime","zhihu","pangu"];
+// AI 二创风格小图标：emoji + 品牌色（预设按 id，自定义用户自选）
+const HUB_ICONS = {
+  qianwen:["🦉","#6d5bd0"], deepseek:["🐋","#4d6bfe"], yuanbao:["💠","#2f7de1"],
+  doubao:["🫘","#3ba3f5"], yiyan:["🌾","#4e7cf0"], glm:["🧠","#3a8fd6"],
+  spark:["✨","#e8912b"], kimi:["🌙","#22252b"], metaso:["🔮","#7d5bd0"],
+  minimax:["⚡","#e05a4f"], step:["👣","#5b6ff0"], baichuan:["🌊","#2f9de0"],
+  tiangong:["🛠","#e07b2b"], sensetime:["👁","#3a9de0"], zhihu:["📚","#3b82f6"],
+  pangu:["🐟","#c0392b"], chatgpt:["🌀","#10a37f"], gemini:["♊","#4285f4"],
+  claude:["✳","#d97757"], grok:["𝕏","#1a1a1a"], copilot:["🧭","#0f7cba"],
+  perplexity:["🔎","#20808d"], mistral:["🌬","#fa500f"], huggingchat:["🤗","#ffb100"],
+  poe:["🦜","#5b53d6"]
+};
+const HUB_PICK = ["🤖","🌟","🧠","🦄","🎨","🚀","💡","🔮","🦉","🐋","🌙","⚡","🎯","🌈","🪄","💎"];
+function hubIcon(p){
+  let userIcon = null;
+  try{ userIcon = (JSON.parse(localStorage.getItem("zwishHubIcons")||"{}"))[p.id]; }catch(e){}
+  if (userIcon) return [userIcon, "#6d5bd0"];
+  if (p.icon) return [p.icon, "#6d5bd0"];
+  return HUB_ICONS[p.id] || ["🌐", "#888"];
+}
+// 自定义网站 = 已配置通道里、id 不在预设库中的项
+function customChannels(){
+  const ids = new Set((S.webPresets||[]).map(p=>p.id));
+  return (S.webChannels||[]).filter(c=>!ids.has(c.id));
+}
 function hubGroups(){
   const ps = S.webPresets||[];
   return [["🌏 国内主流", ps.filter(p=>HUB_CN.includes(p.id))],
-          ["🌍 海外主流", ps.filter(p=>!HUB_CN.includes(p.id))]];
+          ["🌍 海外主流", ps.filter(p=>!HUB_CN.includes(p.id))],
+          ["⭐ 我的自定义网站", customChannels()]];
 }
 function openHub(){ renderHub(); $("hubp").classList.add("on"); }
-function closeHub(){ $("hubp").classList.remove("on"); }
+function closeHub(){ closeHubForm(); $("hubp").classList.remove("on"); }
 function renderHub(){
   const box = $("hublist");
   if (!box) return;
   const configured = S.webChannels||[];
-  box.innerHTML = hubGroups().map(([title, ps])=>{
+  const groups = hubGroups().filter(([_,ps])=>ps.length);
+  box.innerHTML = groups.map(([title, ps])=>{
     const items = ps.map(p=>{
       const ch = configured.find(c=>c.id===p.id);
       const on = S.model === "web:"+p.id;
-      const state = ch ? (ch.ok ? "✓ 已就绪" : "待登录") : "";
-      const initial = (p.name||"?").replace(/[^A-Za-z\u4e00-\u9fa5]/g,"").slice(0,1) || "🌐";
+      const state = ch ? (ch.ok ? "✓ 就绪" : "待登录") : "未添加";
+      const [emoji, color] = hubIcon(p);
+      const ops = ch ? `<span class="hubops">
+        <span title="打开登录窗口" onclick="event.stopPropagation();hubLogin('${esc(p.id)}')">🔑</span>
+        <span title="检测输入框状态" onclick="event.stopPropagation();hubStatus('${esc(p.id)}')">🔍</span>
+        <span title="移除此通道" onclick="event.stopPropagation();hubRemove('${esc(p.id)}')">🗑</span></span>` : "";
       return `<div class="hubitem ${on?"on":""}" onclick="pickPreset('${esc(p.id)}')">
-        <span class="hlogo">${esc(initial)}</span>
-        <span class="hname">${esc(p.name)}<small>${esc(p.url)}</small></span>
-        <span class="hstate">${state}</span></div>`;
+        <span class="hlogo emoji" style="background:${esc(color)}">${esc(emoji)}</span>
+        <span class="hname">${esc(p.name)}<small>${esc(p.url||"")}</small></span>
+        <span class="hstate">${state}</span>${ops}</div>`;
     }).join("");
-    return `<div class="hubgroup">${title}</div>${items}`;
-  }).join("");
+    return `<div class="hubgroup">${title} <span style="font-weight:400">(${ps.length})</span></div>${items}`;
+  }).join("") || '<div class="hempty">暂无网站，点下方添加 ↓</div>';
+}
+// 操作按钮
+async function hubLogin(id){
+  try{ const r = await api("/api/webchat_login", {id}); toast(r.ok ? "已弹出登录窗口："+id : ("登录失败："+(r.error||""))); }
+  catch(e){ toast("登录失败："+e.message, true); }
+}
+async function hubStatus(id){
+  try{ const r = await api("/api/webchat_status", {id});
+    toast(r.error ? ("❌ "+r.error) : (r.hasComposer?"✅ 输入框就绪":"⚠ 未找到输入框")); }
+  catch(e){ toast("检测失败："+e.message, true); }
+}
+async function hubRemove(id){
+  if (!confirm("确定移除通道「"+id+"」？登录态目录会保留，可重新添加。")) return;
+  try{
+    const cur = await api("/api/webchat_channels");
+    const keep = (cur.channels||[]).filter(c=>c.id!==id);
+    const r = await api("/api/save_webchat_channels", {channels:keep});
+    if (!r.ok) throw new Error(r.error||"移除失败");
+    S.webEdit = (r.channels||[]).map(c=>({...webBlank(), ...c,
+      selectors:{...webBlank().selectors, ...(c.selectors||{})}}));
+    S.webChannels = S.webEdit.filter(c=>c.enabled!==false);
+    if (S.model === "web:"+id) S.model = "auto";
+    renderWebChips(); renderHub(); toast("已移除「"+id+"」");
+  }catch(e){ toast("移除失败："+e.message, true); }
+}
+// 添加自定义网站表单
+let _hubPickIcon = "🤖";
+function openHubForm(){
+  const box = $("hfIcons");
+  if (box && !box.children.length){
+    box.innerHTML = HUB_PICK.map(x=>`<span class="${x===_hubPickIcon?"sel":""}" onclick="hubPickIcon(this,'${x}')">${x}</span>`).join("");
+  }
+  $("hubform").classList.add("on");
+}
+function closeHubForm(){ const f=$("hubform"); if(f) f.classList.remove("on"); }
+function hubPickIcon(el, x){
+  _hubPickIcon = x;
+  el.parentElement.querySelectorAll("span").forEach(s=>s.classList.remove("sel"));
+  el.classList.add("sel");
+}
+async function saveCustomSite(){
+  const name = ($("hfName").value||"").trim();
+  const url = ($("hfUrl").value||"").trim();
+  if (!name){ toast("请填名称", true); return; }
+  if (!/^https?:\/\//i.test(url)){ toast("网址需以 http:// 或 https:// 开头", true); return; }
+  // 生成合法 id：中文名用拼音不方便，直接用 site_+时间戳
+  const id = "site_" + Date.now().toString(36);
+  const ch = {...webBlank(), id, name, url, enabled:true, icon:_hubPickIcon};
+  toast("正在添加「"+name+"」…");
+  try{
+    const cur = await api("/api/webchat_channels");
+    const chans = (cur.channels||[]).map(c=>({...c}));
+    chans.push(ch);
+    const r = await api("/api/save_webchat_channels", {channels:chans});
+    if (!r.ok) throw new Error(r.error||"保存失败");
+    S.webEdit = (r.channels||[]).map(c=>({...webBlank(), ...c,
+      selectors:{...webBlank().selectors, ...(c.selectors||{})}}));
+    S.webChannels = (await api("/api/webchat_channels")).channels||[];
+    // 记录自定义图标到内存（下次刷新从 name 兜底，图标存 localStorage）
+    try{ const m = JSON.parse(localStorage.getItem("zwishHubIcons")||"{}"); m[id]=_hubPickIcon;
+         localStorage.setItem("zwishHubIcons", JSON.stringify(m)); }catch(e){}
+    $("hfName").value=""; $("hfUrl").value="";
+    closeHubForm();
+    renderWebChips(); renderHub();
+    toast("「"+name+"」已添加，点它即可切换（首次请登录）");
+  }catch(e){ toast("添加失败："+e.message, true); }
 }
 async function pickPreset(pid){
-  const p = (S.webPresets||[]).find(x=>x.id===pid);
+  const p = (S.webPresets||[]).find(x=>x.id===pid)
+         || (S.webChannels||[]).find(x=>x.id===pid);
   if (!p) return;
   // 顶部入口可能在设置面板从未打开时使用：确保已加载现有通道
   if (!S.webEdit) S.webEdit = [];
+  let cur = null;
   try{
-    const cur = await api("/api/webchat_channels");
+    cur = await api("/api/webchat_channels");
     S.webEdit = (cur.channels||[]).map(c=>({...webBlank(), ...c,
       selectors:{...webBlank().selectors, ...(c.selectors||{})}}));
     S.webChannels = cur.channels||[];
@@ -1278,8 +1407,8 @@ async function pickPreset(pid){
       selectors:{...webBlank().selectors, ...(c.selectors||{})}}));
     // 重拉 list_all（含 ok/msg）刷新顶部 chip 与状态
     try{
-      const cur = await api("/api/webchat_channels");
-      S.webChannels = (cur.channels||[]).filter(c=>c.enabled!==false);
+      const c2 = await api("/api/webchat_channels");
+      S.webChannels = (c2.channels||[]).filter(c=>c.enabled!==false);
     }catch(e){ S.webChannels = (r.channels||[]).filter(c=>c.enabled!==false); }
     renderWebChips();
     closeHub();

@@ -244,6 +244,7 @@ def save_user_channels(channels):
             "browser": str(ch.get("browser") or "auto").strip() or "auto",
             "headless": bool(ch.get("headless", False)),
             "profile": str(ch.get("profile") or "").strip(),
+            "icon": str(ch.get("icon") or "").strip()[:4],  # 顶部入口的 emoji 小图标
             "selectors": {k: (v if isinstance(v, list) else [])
                           for k, v in sels.items() if k in _DEFAULT_SELECTORS},
         })
@@ -294,6 +295,7 @@ def _channels():
             "browser": ch.get("browser") or "auto",
             "headless": bool(ch.get("headless", False)),
             "profile": str(ch.get("profile") or "").strip(),
+            "icon": str(ch.get("icon") or "").strip()[:4],
             "selectors": ch.get("selectors") or {},
         })
     return out
@@ -362,6 +364,7 @@ def list_all():
             "browser": ch.get("browser") or "auto",
             "headless": bool(ch.get("headless", False)),
             "profile": str(ch.get("profile") or "").strip(),
+            "icon": str(ch.get("icon") or "").strip()[:4],
             "selectors": ch.get("selectors") or {},
             "ok": ok,
             "msg": msg,
