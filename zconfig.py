@@ -84,6 +84,14 @@ _DEFAULTS = {
                    '[class*="markdown"]'],
         "generating": [],
     },
+    # ── 对话后自动清理（Issue: 对话完后原网页自动删除）────────────
+    # 每次网页通道（DS/元宝/自定义）对话结束后执行，UI 可在
+    # ⚙️ 设置 → 🌐 网页通道里改，保存到 web_cleanup.json（已 gitignore）。
+    "web_cleanup": {
+        "delete_chat": True,    # 尽力删掉 AI 网站上的本次聊天记录
+        "close_tab": True,      # 关闭本次自动化打开的网页标签
+        "close_login": True,    # 关闭该浏览器残留的登录窗口（登录态仍在 profile）
+    },
 }
 
 # 内置 DeepSeek API 预置（settings 里「一键预置」写入 providers.json）

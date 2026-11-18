@@ -172,6 +172,11 @@
   .settabs .tab:hover{color:var(--acc)}
   .settabs .tab.on{color:var(--acc); border-bottom-color:var(--acc); font-weight:600}
   .sbody{flex:1; overflow-y:auto; padding:16px}
+  .cleanbox{margin:12px 20px 0; padding:12px 14px; background:var(--panel); border:1px solid var(--line); border-radius:12px}
+  .cleanbox .ctitle{font-size:13px; font-weight:600; margin-bottom:9px}
+  .cleanbox .crow{display:flex; gap:14px; align-items:center; flex-wrap:wrap}
+  .cleanbox .crow .sw{display:flex; align-items:center; gap:5px; font-size:12px; cursor:pointer}
+  .cleanbox .chint{font-size:11px; color:var(--dim); line-height:1.6; margin-top:8px}
   .pbody{flex:1; overflow-y:auto; padding:16px}
   .pitem{background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:13px 14px; margin-bottom:13px}
   .pitem.custom{border-left:3px solid var(--acc)}
@@ -329,6 +334,16 @@
         声明任意 AI 对话网站（千问 / Grok / 文心一言 / Kimi…），像内置通道一样用于追问 / 精修。
         <b>每个通道独立登录态，需首次在弹出窗口登录一次</b>；文字会发到该网站，<b>图片与看图点评仍走本地</b>。
         不自动登录、不绕过平台限额。选择器可按报错里的 DOM 诊断调整。
+      </div>
+      <div class="cleanbox" id="cleanBox">
+        <div class="ctitle">🧹 对话后自动清理 <span style="font-weight:400;color:var(--dim)">（每次网页对话结束后执行）</span></div>
+        <div class="crow">
+          <label class="sw"><input type="checkbox" id="ckDelChat" checked> 删除网站聊天记录</label>
+          <label class="sw"><input type="checkbox" id="ckCloseTab" checked> 关闭本次网页标签</label>
+          <label class="sw"><input type="checkbox" id="ckCloseLogin" checked> 关闭残留登录窗口</label>
+          <button class="btn mini" onclick="saveCleanup()">💾 保存清理设置</button>
+        </div>
+        <div class="chint">「删除聊天记录」尽力点击站点的「删除 / 新建对话」按钮；是否从账号历史彻底移除由各网站自身决定。</div>
       </div>
       <div style="padding:10px 20px; border-bottom:1px solid var(--line); display:flex; gap:8px; align-items:center; flex-wrap:wrap">
         <span style="font-size:12px; color:var(--dim); white-space:nowrap">✨ 智能添加</span>
@@ -1422,6 +1437,7 @@ async function pickPreset(pid){
 async function loadWebChannelsUI(){
   const box = $("wbody");
   await loadWebPresets();
+  loadCleanup();
   try{
     const r = await api("/api/webchat_channels");
     S.webEdit = (r.channels||[]).map(c=>({...webBlank(), ...c,
@@ -1429,6 +1445,26 @@ async function loadWebChannelsUI(){
     S.webSource = r.source || "config";
   }catch(e){ S.webEdit=[]; S.webSource="config"; }
   renderWebChannels();
+}
+/* ── 对话后自动清理开关 ── */
+async function loadCleanup(){
+  try{
+    const r = await api("/api/web_cleanup");
+    if ($("ckDelChat")) $("ckDelChat").checked = r.delete_chat !== false;
+    if ($("ckCloseTab")) $("ckCloseTab").checked = r.close_tab !== false;
+    if ($("ckCloseLogin")) $("ckCloseLogin").checked = r.close_login !== false;
+  }catch(e){ /* file:// 或无后端时静默 */ }
+}
+async function saveCleanup(){
+  const cleanup = {
+    delete_chat: $("ckDelChat").checked,
+    close_tab: $("ckCloseTab").checked,
+    close_login: $("ckCloseLogin").checked
+  };
+  try{
+    const r = await api("/api/save_web_cleanup", {cleanup});
+    toast(r.ok ? "✅ 清理设置已保存" : ("保存失败："+(r.error||"")) , !r.ok);
+  }catch(e){ toast("保存失败："+e.message, true); }
 }
 function renderWebChannels(){
   const el = $("wbody");

@@ -105,10 +105,15 @@ atexit.register(shutdown_browser)
 
 
 def open_login_window():
-    """打开元宝页面供用户登录（不发送任何内容），返回 (browser, ws, target_id)。"""
+    """打开元宝页面供用户登录（不发送任何内容），返回 (browser, ws, target_id)。
+
+    登录窗口登记到 zds 的残留表：对话结束后由 close_login_tabs 统一关闭，
+    避免登录窗口永久残留占用桌面（Issue: 对话完后原网页自动删除）。
+    """
     browser = get_browser()
     url = CFG.get("yuanbao_web_chat_url") or "https://yuanbao.tencent.com/"
     ws, target_id = browser.new_tab(url)
+    zds.register_login_tab(browser, target_id)
     return browser, ws, target_id
 
 
@@ -165,6 +170,7 @@ def _web_chat_locked(system, user, timeout):
 
     browser = get_browser()
     ws = target_id = None
+    msg_sent = False
     try:
         ws, target_id = browser.new_tab(url)
         time.sleep(2)
@@ -249,6 +255,7 @@ def _web_chat_locked(system, user, timeout):
             raise RuntimeError(
                 "元宝发送按钮不可用（%s）。请确认输入框已成功填入文本，"
                 "或在 yuanbao_web_selectors.send 中更新选择器。" % send_state)
+        msg_sent = True
 
         # 等待回复：取最后一个候选答案节点，连续 3 次稳定且无生成中标志。
         probe = f"""(function(){{
@@ -292,15 +299,25 @@ def _web_chat_locked(system, user, timeout):
                 % (baseline.get("count", 0), baseline.get("bodyLen", 0)))
         return last_text
     finally:
+        if msg_sent:
+            try:
+                zds.delete_chat_record(ws)
+            except Exception:
+                pass
+        try:
+            zds.close_login_tabs(browser)
+        except Exception:
+            pass
         try:
             if ws:
                 ws.close()
         except Exception:
             pass
-        try:
-            browser.close_tab(target_id)
-        except Exception:
-            pass
+        if zds._cleanup_cfg().get("close_tab", True):
+            try:
+                browser.close_tab(target_id)
+            except Exception:
+                pass
 
 
 def _read_probe(raw):

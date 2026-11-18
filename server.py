@@ -308,6 +308,13 @@ class H(BaseHTTPRequestHandler):
                 return self._json({"presets": zwebchat.PRESETS})
             except Exception as e:
                 return self._json({"error": str(e)})
+        if path == "/api/web_cleanup":
+            # 对话后清理开关（删聊天记录 / 关标签页 / 关登录窗口）
+            try:
+                import zds
+                return self._json(zds.cleanup_state())
+            except Exception as e:
+                return self._json({"error": str(e)})
         if path == "/api/webchat_channels":
             # 网页自配置通道列表（含 disabled），供设置面板编辑
             try:
@@ -390,6 +397,15 @@ class H(BaseHTTPRequestHandler):
                 if not ok:
                     return self._json({"ok": False, "error": msg})
                 return self._json({"ok": True, "msg": msg, "channels": cleaned})
+
+            if path == "/api/save_web_cleanup":
+                # 对话后清理开关（删聊天记录 / 关标签页 / 关登录窗口）
+                import zds
+                try:
+                    saved = zds.save_cleanup_cfg(b.get("cleanup", {}))
+                    return self._json({"ok": True, "cleanup": saved})
+                except Exception as e:
+                    return self._json({"ok": False, "error": str(e)})
 
             if path == "/api/open_folder":
                 try: os.startfile(OUTDIR)

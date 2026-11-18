@@ -28,6 +28,8 @@ import zprompts
 
 CFG = zconfig.CFG
 PROFILE = CFG.get("ds_profile_dir") or os.path.join(zconfig.HERE, "data", "ds_profile")
+# 对话后清理开关的持久化文件（已 gitignore），与 prompts.json 同属"用户覆盖"
+CLEANUP_FILE = os.path.join(zconfig.HERE, "web_cleanup.json")
 
 _WS_GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 _SEND_SELS = ['button:has-text("发送")', '[data-testid="send-button"]',
@@ -434,6 +436,153 @@ def _js_str(s):
     return json.dumps(s, ensure_ascii=False)
 
 
+# ── 对话后清理：删网站聊天记录 + 关残留网页（Issue: 对话完后原网页自动删除）──
+# 用户选择的两项：① 删除 AI 网站上的本次聊天记录（账号不留痕）；
+#                ② 关闭自动化打开的标签页 / 残留登录窗口。
+# 设计原则：best-effort，任何一步失败都只记日志、绝不影响已经拿到的回复文本。
+#
+#  Per-channel cleanup 配置（config.json 的 web_cleanup 段）：
+#    "web_cleanup": {
+#      "delete_chat": true,   # 对话后尝试删除网站聊天记录（默认开）
+#      "close_tab": true,     # 对话后关闭本次标签页（默认开；finally 里本就关）
+#      "close_login": true    # 对话后关闭该浏览器残留的登录窗口（默认开）
+#    }
+#  删除按钮选择器各站点不同，通用兜底见下；可在 config 里用 web_cleanup.delete_selectors
+#  覆盖，或在自定义通道里用 selectors.delete_chat 覆盖。
+
+# 通用「删除 / 新建对话」按钮选择器：命中"删除/清空"优先，退而求其次点"新对话"。
+# 说明：多数站点没有直接的"删除单条对话"按钮，点"新对话/New chat"可让本次会话
+# 从当前视图消失、下次打开不再续上（是否从账号历史彻底移除由站点自身决定）。
+_DELETE_CHAT_SELS = [
+    # 删除 / 清空当前会话（最贴合"删聊天记录"）
+    'button[aria-label*="删除对话"]', 'button[title*="删除对话"]',
+    'button:has-text("删除对话")', '[role="button"]:has-text("删除对话")',
+    '[aria-label*="清空对话"]', 'button:has-text("清空对话")',
+    '[aria-label*="删除会话"]', 'button:has-text("删除会话")',
+    '[aria-label*="Delete chat"]', '[title*="Delete chat"]',
+    'button:has-text("Delete chat")', '[data-testid*="delete-chat"]',
+    # 新建对话（兜底：让本次会话不再续上）
+    '[aria-label*="新建对话"]', '[title*="新建对话"]',
+    'button:has-text("新对话")', 'button:has-text("新建对话")',
+    '[aria-label*="New chat"]', '[title*="New chat"]',
+    'button:has-text("New chat")', '[data-testid*="new-chat"]',
+]
+# 删除后的二次确认弹窗按钮
+_DELETE_CONFIRM_SELS = [
+    'button:has-text("确定")', 'button:has-text("删除")',
+    'button:has-text("确认")', '[role="button"]:has-text("删除")',
+    'button:has-text("Delete")', 'button:has-text("Confirm")',
+]
+
+# 记录每个浏览器实例打开过的「登录窗口」target_id，供对话后统一关闭。
+# key = id(browser)，value = set(target_id)。仅本地内存，进程退出自然清空。
+_LOGIN_TABS = {}
+_LOGIN_TABS_LOCK = threading.Lock()
+
+
+def _cleanup_cfg():
+    """读取对话后清理配置：web_cleanup.json（UI 保存）> config.json > 默认值。"""
+    base = {"delete_chat": True, "close_tab": True, "close_login": True}
+    c = CFG.get("web_cleanup")
+    if isinstance(c, dict):
+        base.update(c)
+    try:
+        with open(CLEANUP_FILE, encoding="utf-8") as f:
+            ov = json.load(f)
+        if isinstance(ov, dict):
+            base.update({k: v for k, v in ov.items() if k in base})
+    except (OSError, ValueError):
+        pass
+    return base
+
+
+def cleanup_state():
+    """供前端展示：当前生效的清理开关 + 配置文件名。"""
+    cfg = _cleanup_cfg()
+    return {**cfg, "file": os.path.basename(CLEANUP_FILE)}
+
+
+def save_cleanup_cfg(data):
+    """保存 UI 的清理开关（只写 bool 值，原子写）。返回清理后的字典。"""
+    src = data if isinstance(data, dict) else {}
+    clean = {k: bool(src.get(k, _cleanup_cfg().get(k, True)))
+             for k in ("delete_chat", "close_tab", "close_login")}
+    tmp = CLEANUP_FILE + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(clean, f, ensure_ascii=False, indent=2)
+    os.replace(tmp, CLEANUP_FILE)
+    return clean
+
+
+def register_login_tab(browser, target_id):
+    """登记一个登录窗口标签页，供对话结束后 close_login_tabs 统一关闭。"""
+    if not browser or not target_id:
+        return
+    with _LOGIN_TABS_LOCK:
+        _LOGIN_TABS.setdefault(id(browser), set()).add(target_id)
+
+
+def close_login_tabs(browser):
+    """关闭该浏览器实例残留的登录窗口（不影响浏览器进程与登录态 profile）。"""
+    if not _cleanup_cfg().get("close_login", True):
+        return 0
+    if not browser:
+        return 0
+    with _LOGIN_TABS_LOCK:
+        tids = list(_LOGIN_TABS.pop(id(browser), set()))
+    n = 0
+    for tid in tids:
+        try:
+            browser.close_tab(tid)
+            n += 1
+        except Exception:
+            pass
+    return n
+
+
+def delete_chat_record(ws, selectors=None, timeout=8):
+    """尽力删除当前 AI 网站上的本次对话记录。返回命中描述（便于日志/测试）。
+
+    best-effort：找不到按钮 / JS 异常都返回状态串，绝不抛错。
+    selectors 可覆盖默认列表（自定义通道用 selectors.delete_chat）。
+    """
+    if not _cleanup_cfg().get("delete_chat", True):
+        return "disabled"
+    if not ws:
+        return "no-ws"
+    sels = selectors if isinstance(selectors, list) and selectors else _DELETE_CHAT_SELS
+    sels_js = json.dumps(sels, ensure_ascii=False)
+    confirm_js = json.dumps(_DELETE_CONFIRM_SELS, ensure_ascii=False)
+    expr = f"""(function(){{
+      var sels = {sels_js};
+      var btn = window.__zfind(sels);
+      if (!btn) return 'no-button';
+      var which = '';
+      for (var i=0;i<sels.length;i++){{
+        try {{ var n = window.__zfind([sels[i]]);
+               if (n === btn) {{ which = sels[i]; break; }} }} catch(e) {{}}
+      }}
+      try {{ btn.click(); }} catch(e) {{ return 'click-error'; }}
+      return 'clicked:' + (which || 'unknown');
+    }})()"""
+    try:
+        hit = _eval(ws, expr, timeout=timeout) or "none"
+    except Exception:
+        return "error"
+    # 若点的是"删除"，稍等确认弹窗再点"确定"（新建对话一般无确认，快速跳过）
+    if isinstance(hit, str) and hit.startswith("clicked") and (
+            "删除" in hit or "delete" in hit.lower()):
+        time.sleep(0.6)
+        conf = f"""(function(){{ var b = window.__zfind({confirm_js});
+          if (b) {{ try {{ b.click(); return 'confirmed'; }} catch(e) {{}} }}
+          return 'no-confirm'; }})()"""
+        try:
+            hit += "|" + str(_eval(ws, conf, timeout=timeout) or "no-confirm")
+        except Exception:
+            hit += "|confirm-error"
+    return hit
+
+
 def web_chat(system, user, timeout=150):
     # 默认 timeout=150：登录阶段另计最多 30s，最坏总耗时 ≈ 180s，
     # 与前端 api() 的 AbortController 180s 超时预算对齐，避免前端先放弃
@@ -468,6 +617,7 @@ def _web_chat_locked(system, user, timeout):
 
     browser = get_browser()
     ws = target_id = None  # 会话状态局部持有（Issue #9），finally 显式传参
+    msg_sent = False
     try:
         ws, target_id = browser.new_tab(url)
         # 页面加载（含 redirect）
@@ -544,6 +694,7 @@ def _web_chat_locked(system, user, timeout):
           return 'enter';
         }})();"""
         _eval(ws, send)
+        msg_sent = True
 
         # 等回复：抓最后一条助手文本，连续 3 次稳定且不在生成中
         prev = _eval(ws, f"""(function(){{var n=window.__zfind({answers});
@@ -576,6 +727,18 @@ def _web_chat_locked(system, user, timeout):
             raise RuntimeError("未读取到新的 DeepSeek 回复，可能网页结构变化或会话异常，请重试一次")
         return last_text
     finally:
+        # 对话后清理（Issue: 对话完后原网页自动删除）：
+        # ① 消息确已发出时，尽力删掉本站在账号里的聊天记录；
+        # ② 关闭该浏览器残留的登录窗口。均在 ws 仍存活时执行，best-effort。
+        if msg_sent:
+            try:
+                delete_chat_record(ws)
+            except Exception:
+                pass
+        try:
+            close_login_tabs(browser)
+        except Exception:
+            pass
         # 常驻复用：只断开本会话的 WebSocket 并关闭本次标签页（显式传本次的
         # target_id，不读共享状态），浏览器进程保留，下次调用直接复用。
         # 进程整体退出时由 atexit 清理。
@@ -584,10 +747,11 @@ def _web_chat_locked(system, user, timeout):
                 ws.close()
         except Exception:
             pass
-        try:
-            browser.close_tab(target_id)
-        except Exception:
-            pass
+        if _cleanup_cfg().get("close_tab", True):
+            try:
+                browser.close_tab(target_id)
+            except Exception:
+                pass
 
 
 if __name__ == "__main__":
