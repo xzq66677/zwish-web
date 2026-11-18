@@ -558,6 +558,25 @@ def channel_name(cid):
         return cid
 
 
+def _page_meta(ws):
+    """读取当前页面元信息（是否加载完成、可见文本长度、URL、标题）。
+
+    用于区分「登录页 / 正常页」（有文案，值得继续等用户登录）与
+    「白页 / 打不开」（几乎没文本，等下去也没意义）——见 issue #37。
+    """
+    raw = zds._eval(ws, """(function(){
+      var b = document.body;
+      return JSON.stringify({ready: document.readyState === 'complete',
+        len: ((b && b.innerText) || '').replace(/\\s+/g, ' ').trim().length,
+        url: location.href, title: (document.title || '')});
+    })()""")
+    try:
+        d = json.loads(raw) if raw else {}
+    except Exception:
+        d = {}
+    return d if isinstance(d, dict) else {}
+
+
 def web_chat(cid, system, user, timeout=150):
     """在自定义 AI 网页发起一次对话，返回助手回复文本。
 
@@ -595,6 +614,7 @@ def _web_chat_locked(cid, system, user, timeout):
         # 等待登录：composer 出现即就绪；登录页文案快速识别并提示。
         login_deadline = time.time() + min(timeout, 120)
         login_grace = time.time() + 15
+        blank_deadline = time.time() + 25
         prompted = False
         while time.time() < login_deadline:
             if zds._eval(ws, f"!!window.__zfind({composers})"):
@@ -604,10 +624,26 @@ def _web_chat_locked(cid, system, user, timeout):
                     prompted = True
                     print(f"[zwebchat:{cid}] 请在弹出的浏览器窗口完成登录，"
                           "登录后自动继续…", flush=True)
+            # 白页快速失败（issue #37）：25 秒还找不到输入框、页面又几乎没有文本，
+            # 说明站点根本没打开（被墙/断网/域名变了），不该让用户干等 120 秒。
+            if not prompted and time.time() > blank_deadline:
+                meta = _page_meta(ws)
+                if (meta.get("len") or 0) < 200 or not meta.get("ready"):
+                    title = (meta.get("title") or "")[:40]
+                    raise RuntimeError(
+                        f"打不开 {ch['name']}（{meta.get('url') or url}）："
+                        f"25 秒内没有加载出对话界面，页面文本仅 {meta.get('len') or 0} 字符"
+                        + (f"，标题：{title}" if title else "")
+                        + "。常见原因：国内直连不通（需代理）、站点改版、"
+                          "或必须先登录才显示输入框。可在「🌐 AI 网页」里换一个通道，"
+                          "或先点 🔑 打开登录窗口登录后重试。")
+                blank_deadline = time.time() + 40   # 页面有内容（如登录页），继续等用户登录
             time.sleep(1)
         else:
+            meta = _page_meta(ws)
             raise RuntimeError(
-                f"等待 {ch['name']} 登录/加载超时。请在程序弹出的浏览器窗口中登录一次"
+                f"等待 {ch['name']} 登录/加载超时（页面文本 {meta.get('len') or 0} 字符）。"
+                "请在程序弹出的浏览器窗口中登录一次"
                 f"（登录态保存在 {_profile_dir(ch)}），之后自动复用；"
                 "若已登录仍超时，可能是网页改版，请更新 custom_web_channels 的 "
                 "selectors.composer。")
@@ -740,7 +776,8 @@ def _web_chat_locked(cid, system, user, timeout):
             raise RuntimeError(
                 f"未读取到 {ch['name']} 回复（候选节点 {baseline.get('count', 0)} 个，"
                 f"页面文本 {baseline.get('bodyLen', 0)} 字符）。可能是网页改版、未登录"
-                "或触发平台限额；请更新 custom_web_channels 中该通道的 "
+                "或触发平台限额；可先点 🔑 打开登录窗口确认已登录，或在「🌐 AI 网页」里"
+                "换一个通道；若要继续用该站，请更新 custom_web_channels 中该通道的 "
                 "selectors.answer 后重试。")
         return last_text
     finally:

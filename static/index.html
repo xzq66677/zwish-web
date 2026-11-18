@@ -16,16 +16,30 @@
   .main{flex:1; display:flex; flex-direction:column; align-items:center; border-right:1px solid var(--line); min-width:0}
   .col{width:100%; max-width:560px; flex:1; display:flex; flex-direction:column; min-height:0}
   header{display:flex; align-items:center; gap:12px; padding:14px 22px; border-bottom:1px solid var(--line);
-         flex-wrap:wrap; row-gap:10px}
+         flex-wrap:nowrap; min-width:0; overflow-x:auto; scrollbar-width:none}
+  header::-webkit-scrollbar{display:none}
   header .logo{font-family:var(--serif); font-weight:700; font-size:18px}
   header .logo em{color:var(--acc); font-style:normal}
   .chip{background:transparent; border:1px solid var(--line2); border-radius:20px; padding:5px 15px;
-        font-size:13px; cursor:pointer; color:var(--dim); white-space:nowrap}
+        font-size:13px; cursor:pointer; color:var(--dim); white-space:nowrap; flex:0 0 auto}
   .chip.on{border-color:var(--acc); color:var(--acc); background:var(--acc-soft)}
+  /* 窄屏自适应：状态区先只留绿点、再收窄 chip 内边距，保证顶栏永远单行 */
+  @media (max-width:1080px){
+    header{gap:9px; padding:12px 16px}
+    .chip{padding:5px 11px}
+  }
+  @media (max-width:880px){
+    header .logo{font-size:16px}
+    .chip{padding:5px 8px; font-size:12px}
+    .newchat{padding:5px 10px; font-size:12px}
+  }
   .chip .wico{display:inline-flex; width:18px; height:18px; border-radius:5px; overflow:hidden;
         vertical-align:-4px; margin-right:5px; align-items:center; justify-content:center;
         font-size:12px; line-height:1; color:#fff; background:#888}
   .chip .wico img{width:100%; height:100%; object-fit:cover; display:block}
+  /* 选中网页通道后，名字就显示在「🌐 AI 网页」这颗 chip 里；过长时省略，避免顶栏变宽 */
+  .chip .hnameChip{display:inline-block; max-width:110px; overflow:hidden;
+        text-overflow:ellipsis; white-space:nowrap; vertical-align:bottom}
   .dot{width:8px;height:8px;border-radius:50%;background:var(--ok); box-shadow:0 0 6px #788C5D66}
   .status{color:var(--dim); font-size:12px; display:flex; align-items:center; gap:7px; white-space:nowrap}
   header .sp{flex:1}
@@ -79,6 +93,10 @@
   .attach b{font-weight:600; max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
   .attach span{cursor:pointer; color:var(--err); font-weight:700}
   .err{color:var(--err); font-size:13px}
+  .errbox b{color:var(--err); font-size:13.5px}
+  .errbox .errmsg{color:var(--dim); font-size:12.5px; line-height:1.65; margin-top:7px;
+                  white-space:pre-wrap; word-break:break-word}
+  .mtag.bad{background:#F7E7E2; color:var(--err)}
   .inputbar{display:flex; gap:8px; padding:9px 12px; border-top:1px solid var(--line); background:var(--bg)}
   .inputbar input{flex:1; background:#fff; border:1px solid var(--line2); border-radius:11px; padding:8px 14px; color:var(--txt); font-size:14px; outline:none}
   .inputbar input:focus{border-color:var(--acc)}
@@ -210,7 +228,10 @@
 
   /* ── 窄窗口适配 ── */
   @media (max-width:1180px){
-    .status{display:none}
+    /* 只留状态绿点、隐藏文字：既省宽度又不丢「服务在线」这个信号 */
+    .status{font-size:0; gap:0}
+    /* 历史 / 设置 只留图标，给通道 chip 让出宽度（悬停仍有 title 说明） */
+    .chip .lbl{display:none}
   }
   @media (max-width:680px){
     .side{display:none}
@@ -236,11 +257,11 @@
       <span class="chip" id="chipDsApi" onclick="setModel('ds_api')" title="内置提示词，走 DeepSeek 官方 API">DS · API</span>
       <span class="chip" id="chipCloud" onclick="setModel('cloud')" style="display:none">☁️ 云端</span>
       <span class="chip" id="chipHub" onclick="openHub()" title="一键选择 AI 网站作为润色通道">🌐 AI 网页</span>
-      <span class="chip" onclick="openHistory()">📜 历史记录</span>
-      <span class="chip" onclick="openSettings()">⚙️ 设置</span>
       <span class="sidebtn" onclick="toggleSide()">🗂 画廊 / 参数</span>
       <select id="cloudSel" style="display:none" onchange="S.cloudSel=this.value"></select>
       <span class="sp"></span>
+      <span class="chip" onclick="openHistory()" title="历史记录">📜<span class="lbl"> 历史记录</span></span>
+      <span class="chip" onclick="openSettings()" title="设置">⚙️<span class="lbl"> 设置</span></span>
       <span class="status"><span class="dot"></span>ComfyUI · 全程本地</span>
     </header>
 
@@ -438,8 +459,7 @@ function setModel(m, force){
   [["chipUnc","auto"],["chipCen","fine"],["chipDsApi","ds_api"],
    ["chipCloud","cloud"]].forEach(([id,v]) =>
     $(id).classList.toggle("on", m===v));
-  document.querySelectorAll("[data-webchip]").forEach(el =>
-    el.classList.toggle("on", el.dataset.webchip === m));
+  updateHubChip();   // 网页通道不再各自占一颗 chip，而是就地显示在「🌐 AI 网页」上
   $("cloudSel").style.display = m==="cloud" ? "" : "none";
   if (m === "cloud") refreshCloudSel();
   if (S.askCfg) renderAskBtns();   // 切换通道时刷新推荐问题数
@@ -454,6 +474,41 @@ function addWizard(html, tag){
   chat.appendChild(div); scrollEnd(); return div;
 }
 function addErr(t){ addWizard(`<span class="err">⚠ ${esc(t)}</span>`); }
+// 当前模型的可读名字（网页通道显示其通道名）
+function modelLabel(){
+  const m = S.model || "auto";
+  if (m.startsWith("web:")){
+    const ch = (S.webChannels||[]).find(c=>"web:"+c.id===m);
+    return (ch && ch.name) || m.slice(4);
+  }
+  return ({auto:"自由模式", fine:"精细润色", ds_api:"DS · API", cloud:"云端"})[m] || m;
+}
+// 失败时把还在「转圈」的气泡就地改写成错误卡片：
+// 以前只在下方追加一条错误，上面的 loading 气泡永远留在那里，观感就是「卡死」（issue #37）。
+function failBubble(div, title, msg){
+  if (!div || !div.isConnected){ addErr(title + "：" + msg); return; }
+  const isWeb = (S.model||"").startsWith("web:");
+  const who = div.querySelector(".who");
+  if (who) who.innerHTML = `<span class="z">Z</span> zwish 向导`
+    + `<span class="mtag bad">⚠ 失败</span>`;
+  const bub = div.querySelector(".bubble");
+  if (bub){
+    bub.innerHTML = `<div class="errbox">
+      <b>${esc(title)}</b>
+      <div class="errmsg">${esc(msg)}</div>
+      <div class="actions">
+        ${isWeb ? `<button class="btn" onclick="hubLoginCurrent()">🔑 打开登录窗口</button>` : ""}
+        <button class="btn" onclick="openHub()">🌐 换一个 AI 网页</button>
+        <button class="btn link" onclick="this.closest('.row').remove()">知道了</button>
+      </div></div>`;
+  }
+  scrollEnd();
+}
+async function hubLoginCurrent(){
+  const m = S.model || "";
+  if (!m.startsWith("web:")){ toast("当前不是 AI 网页通道", true); return; }
+  await hubLogin(m.slice(4));
+}
 // 轻量提示：2.6s 自动消失，不往聊天区堆气泡（避免刷屏）
 let _toastTimer=null;
 function toast(msg, isErr){
@@ -499,7 +554,10 @@ setStage("wish", "许个愿（想画什么）…");
 /* ── 愿望 → 追问 ── */
 async function askQuestions(wish){
   S.wish = wish; S.answers = []; S.sel = [];
-  const div = addWizard("✨ 正在理解你的愿望…");
+  const isWeb = (S.model||"").startsWith("web:");
+  const div = addWizard("✨ 正在理解你的愿望…" + (isWeb
+    ? `<div class="note" style="margin-top:6px">通道：${esc(modelLabel())} · 网页自动化较慢，首次需在弹出窗口登录</div>`
+    : ""));
   div.querySelector(".bubble").id = "qsb";
   try{
     const r = await api("/api/questions", {wish, model: modelParam(), count: askEffective()});
@@ -529,7 +587,7 @@ async function askQuestions(wish){
       };
     });
     setStage("questions", "也可以在问题卡里手输自定义答案…");
-  }catch(e){ addErr("追问生成失败：" + e.message); setStage("wish"); }
+  }catch(e){ failBubble(div, "追问生成失败", e.message); setStage("wish"); }
 }
 async function composePrompt(){
   const answers = S.questions.map((q,i)=> S.sel[i] ? `${q.q} → ${S.sel[i]}` : null).filter(Boolean);
@@ -542,7 +600,7 @@ async function composePrompt(){
     div.remove();
     renderPromptCard("已根据你的愿望与回答合成（英文生图词 · 中文说明）");
     setStage("confirm", "💬 交流修改：说出建议，向导会重写完整提示词…");
-  }catch(e){ addErr("提示词合成失败：" + e.message); }
+  }catch(e){ failBubble(div, "提示词合成失败", e.message); }
 }
 
 /* ── 提示词卡片 ── */
@@ -746,7 +804,7 @@ async function doPlan(feedback){
       };
     });
     setStage("refineQ", "手输自定义答案，或点上方按钮…");
-  }catch(e){ addErr("追问生成失败，直接按反馈执行：" + e.message); execPlan(false); }
+  }catch(e){ failBubble(div, "追问生成失败（已跳过追问，直接按反馈执行）", e.message); execPlan(false); }
 }
 async function execPlan(skip){
   const fb = S.pendingFeedback || "";
@@ -778,7 +836,7 @@ async function execPlan(skip){
     }
     S.hist.push({feedback: fbFull, action:p.action});
     S.attach = null;
-  }catch(e){ addErr("微调计划失败：" + e.message); }
+  }catch(e){ failBubble(div, "微调计划失败", e.message); }
   if (S.stage === "refineQ") setStage("refine", "描述想改的地方…");
 }
 
@@ -792,7 +850,7 @@ async function doRewrite(feedback){
     S.w = r.w; S.h = r.h;
     div.remove();
     renderPromptCard("已根据建议重写提示词（英文生图词 · 中文说明），请再确认", r.refiner);
-  }catch(e){ addErr("重写失败：" + e.message); }
+  }catch(e){ failBubble(div, "重写失败", e.message); }
 }
 
 /* ── 主发送路由 ── */
@@ -1175,25 +1233,32 @@ function webBlank(){
   return {id:"", name:"", url:"", enabled:true, browser:"auto", headless:false,
           profile:"", selectors:{composer:[],send:[],answer:[],generating:[]}};
 }
+// 网页通道不各自占一颗 chip：通道一多就把顶栏挤成两行（issue #37）。
+// 顶栏只保留「🌐 AI 网页」一颗入口，选中某通道后就地显示该 AI 的形象图标 + 名称。
 function renderWebChips(){
-  document.querySelectorAll("[data-webchip]").forEach(el=>el.remove());
-  const histChip = document.querySelector('.chip[onclick="openHistory()"]');
-  (S.webChannels||[]).forEach(ch => {
-    const el = document.createElement("span");
-    el.className = "chip";
-    el.id = "chipWeb_" + ch.id;
-    el.dataset.webchip = "web:" + ch.id;
-    const [ic, icBg] = hubIcon(ch);
-    const isImg = typeof ic === "string" && /\.(png|svg|webp|jpg|jpeg)$/i.test(ic);
-    el.innerHTML = `<span class="wico" style="background:${esc(icBg)}">${isImg
-      ? `<img src="${esc(ic)}" alt="" onerror="this.parentNode.textContent='🌐'">`
-      : esc(ic)}</span>${esc(ch.name)}`;
-    el.title = ch.ok ? (ch.name + "（已就绪）\n" + (ch.msg||""))
-                     : (ch.name + " 未就绪：" + (ch.msg||""));
-    el.onclick = () => setModel("web:" + ch.id);
-    if (histChip) histChip.parentElement.insertBefore(el, histChip);
-    else document.querySelector("header").appendChild(el);
-  });
+  document.querySelectorAll("[data-webchip]").forEach(el=>el.remove());  // 清理旧版残留 chip
+  updateHubChip();
+}
+function updateHubChip(){
+  const el = $("chipHub");
+  if (!el) return;
+  const m = S.model || "";
+  const ch = m.startsWith("web:") ? (S.webChannels||[]).find(c=>"web:"+c.id===m) : null;
+  if (!ch){
+    el.classList.remove("on");
+    el.innerHTML = "🌐 AI 网页";
+    el.title = "一键选择 AI 网站作为润色通道";
+    return;
+  }
+  const [ic, icBg] = hubIcon(ch);
+  const isImg = typeof ic === "string" && /\.(png|svg|webp|jpg|jpeg)$/i.test(ic);
+  // 通道名常带「· 网页」后缀，在已经是「AI 网页」入口的 chip 上重复了，去掉更好看
+  const label = String(ch.name || "").replace(/\s*[·・]\s*网页\s*$/, "").trim() || ch.name;
+  el.classList.add("on");
+  el.innerHTML = `<span class="wico" style="background:${esc(icBg)}">${isImg
+    ? `<img src="${esc(ic)}" alt="" onerror="this.parentNode.textContent='🌐'">`
+    : esc(ic)}</span><span class="hnameChip">${esc(label)}</span>`;
+  el.title = "当前润色通道：" + ch.name + "\n点击可切换其它 AI 网站";
 }
 // ── 智能配置：输入网站名/别名，模糊匹配预设库一键填充（issue #28）──
 function presetMatch(q){
@@ -1363,7 +1428,9 @@ function renderHub(){
     const items = ps.map(p=>{
       const ch = configured.find(c=>c.id===p.id);
       const on = S.model === "web:"+p.id;
-      const state = ch ? (ch.ok ? "✓ 就绪" : "待登录") : "未添加";
+      // 注意：ch.ok 只代表「本机浏览器可驱动」，不代表该网站已登录或打得开。
+      // 别写成「✓ 就绪」误导用户（issue #37）。
+      const state = ch ? (ch.ok ? "浏览器就绪 · 首次需登录" : "⚠ 浏览器不可用") : "未添加";
       const [emoji, color] = hubIcon(p);
       const isImg = typeof emoji === "string" && /\.(png|svg|webp|jpg|jpeg)$/i.test(emoji);
       const logoHtml = isImg
@@ -1390,6 +1457,18 @@ async function hubStatus(id){
   try{ const r = await api("/api/webchat_status", {id});
     toast(r.error ? ("❌ "+r.error) : (r.hasComposer?"✅ 输入框就绪":"⚠ 未找到输入框")); }
   catch(e){ toast("检测失败："+e.message, true); }
+}
+// 选中通道后后台预检一次：立刻告诉用户能不能用，不用等发出请求后干等两分钟（issue #37）
+const _probed = {};
+async function probeChannel(id){
+  if (!id || _probed[id]) return;
+  _probed[id] = 1;
+  try{
+    const r = await api("/api/webchat_status", {id});
+    if (r.error) toast("⚠ 预检失败：" + r.error, true);
+    else if (!r.hasComposer) toast("⚠ 未找到输入框：可能未登录或打不开，先点 🔑 登录", true);
+    else toast("✅ 通道已就绪：" + id);
+  }catch(e){ /* 预检失败保持安静，不干扰主流程 */ }
 }
 async function hubRemove(id){
   if (!confirm("确定移除通道「"+id+"」？登录态目录会保留，可重新添加。")) return;
@@ -1482,6 +1561,7 @@ async function pickPreset(pid){
     closeHub();
     setModel("web:"+pid, true);
     toast("已切换到「"+exist.name+"」");
+    probeChannel(pid);          // 后台预检：能不能用现在就告诉用户
     return;
   }
   // 未配置：自动新建 + 保存 + 切换
