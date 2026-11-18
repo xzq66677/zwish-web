@@ -19,10 +19,10 @@ def check(name, cond):
     global _passed, _failed
     if cond:
         _passed += 1
-        print(f"  ✓ {name}")
+        print(f"  [PASS] {name}")
     else:
         _failed += 1
-        print(f"  ✗ {name}")
+        print(f"  [FAIL] {name}")
 
 
 # ── 1. zconfig._is_loopback：ipaddress 精确判断，域名字符串不误判 ──
@@ -53,7 +53,7 @@ const ok2 = !esc("it's").includes("'") && esc("it's").includes("&#39;");
 const ok3 = esc('<b>&').includes('&lt;b&gt;&amp;');
 console.log(JSON.stringify({ok1, ok2, ok3}));
 """
-r = subprocess.run(["node", "-e", node_test], capture_output=True, text=True, timeout=30)
+r = subprocess.run(["node", "-e", node_test], capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30)
 try:
     res = __import__("json").loads(r.stdout.strip() or "{}")
 except Exception:

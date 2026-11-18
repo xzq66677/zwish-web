@@ -17,10 +17,10 @@ def check(name, cond):
     global _passed, _failed
     if cond:
         _passed += 1
-        print(f"  ✓ {name}")
+        print(f"  [PASS] {name}")
     else:
         _failed += 1
-        print(f"  ✗ {name}")
+        print(f"  [FAIL] {name}")
 
 
 print("[1] API Key 脱敏与回填")
@@ -87,7 +87,10 @@ code = (
     "print('RESULT:', zwish.load_providers(), file=sys.stderr)\n"
 )
 r = subprocess.run([sys.executable, "-c", code],
-                   capture_output=True, text=True, cwd=HERE, timeout=30)
+                   capture_output=True, text=True,
+                   encoding="utf-8", errors="replace",
+                   cwd=HERE, timeout=30,
+                   env={**os.environ, "PYTHONIOENCODING": "utf-8"})
 check("解析失败打印警告到 stderr", "解析失败" in (r.stderr or ""))
 check("仍返回空列表不崩溃", "RESULT: []" in (r.stderr or ""))
 
