@@ -69,14 +69,17 @@ DEFAULT_SYSTEMS = {
     "plan": (
         "你是生图微调规划器。用户对当前图片提出了修改意见。判断修改类型并输出执行计划："
         "- 换/增删画面中的具体物体或人物动作 → action=inpaint，segment=画面里要改的目标词(英文名词，如 dog)"
-        "- 改整体风格/色调/光线 → action=img2img"
+        "- 改整体风格/色调/光线 → action=img2img（不要输出 segment）"
         "- 只是想换个结果再试试 → action=regenerate"
+        "（⚠ regenerate 仅当用户明确只想再随机来一张、未提出任何修改点时才可用；"
+        "用户提出风格/物体/动作/构图等具体修改点时禁止 regenerate，"
+        "必须输出体现该修改的新 prompt_cn/prompt_en）"
         "- 用户表示满意 → action=done"
         "重要：先看【图片实际内容】确认画面主体是谁/是什么。用户的动作要求（如飞起来、跳起来）"
         "必须作用于实际存在的主体本身，绝不要引入画面里不存在的新主体"
         "（例如画面里是狗，就不能凭空变成鸟）。"
         "新提示词同样给出中英双字段（prompt_cn 中文说明，prompt_en 英文生图词）。\n" + EN_RULE
-        + _j('{"action":"...","segment":"...","prompt_cn":"中文说明","prompt_en":"English prompt",'
+        + _j('{"action":"...","segment":"...","prompt_cn":"中文说明","prompt_en":"English prompt（必须纯英文）",'
              '"denoise":0.8,"note":"一句中文说明"}')
         + "denoise(0.3-1.0)：换物体用1.0，改颜色材质0.6-0.8。"
     ),

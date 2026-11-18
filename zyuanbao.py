@@ -31,6 +31,21 @@ _SEND_SELS = ['div[aria-label="发送"]', '[aria-label*="发送"]',
 _ANSWER_SELS = ['.hyc-content-md', '[class*="hyc-content"]', '[class*="markdown"]',
                 '[class*="conv-item"] [class*="content"]']
 
+# 元宝通道硬约束：实测（2026-11-18）元宝会把"改风格"类反馈回答成对话式
+# "帮你重新生成"，或用中文长句充当 prompt_en。除共享模板外，这里对每条
+# 消息额外注入通道级契约，并在末尾重复强调（对弱指令模型更有效）。
+_CONTRACT = (
+    "【通道硬性约束】\n"
+    "1. 你是纯文本规划器：不能生成、重绘或\"帮你生成/重新生成\"任何图片，"
+    "绝不输出此类承诺或表述。\n"
+    "2. 只输出一个 JSON 对象：无 markdown 代码块、无解释、无前后缀文字。\n"
+    "3. \"prompt_en\" 必须是纯英文生图词（English only），禁止中文。\n"
+    "4. 用户提出任何具体修改点（风格/物体/动作/构图/情绪）时，禁止"
+    " action=regenerate，必须输出体现该修改的新 prompt_cn/prompt_en；"
+    "regenerate 仅当用户明确只想再随机来一张。\n"
+)
+_CONTRACT_REMINDER = "【再次强调】只输出一个 JSON；\"prompt_en\" 必须是纯英文；不要承诺生成图片。"
+
 
 def _sel(key, default):
     sels = CFG.get("yuanbao_web_selectors") or {}
@@ -141,7 +156,8 @@ def _web_chat_locked(system, user, timeout):
     if not ok:
         raise RuntimeError(msg)
 
-    full = zprompts.ds_wrap(system, user)
+    full = zprompts.ds_wrap(_CONTRACT + "\n" + system,
+                            user + "\n\n" + _CONTRACT_REMINDER)
     composers = json.dumps(_sel("composer", _COMPOSER_SELS), ensure_ascii=False)
     sends = json.dumps(_sel("send", _SEND_SELS), ensure_ascii=False)
     answers = json.dumps(_sel("answer", _ANSWER_SELS), ensure_ascii=False)

@@ -230,6 +230,71 @@ def _normalize_prompt(d, wish=None):
     return d
 
 
+# ── 英文提示词契约（enforce_english_prompt）──────────────────
+# prompt_en 是真正送进 ComfyUI 的生图词。部分网页通道（如元宝）会用中文长句
+# 充当 prompt_en，或对"改风格"类反馈只回 action=regenerate 而不给新提示词，
+# 导致系统拿旧词/中文词直接重画。这里做运行时守卫：缺失或含中文 → 带纠错
+# 指令重试一次；仍失败则明确报错，绝不静默降级。可用 config.json 的
+# enforce_english_prompt=false 关闭（恢复旧的中文直通行为）。
+_CJK_RE = re.compile(r"[\u2e80-\u2fdf\u31c0-\u9fff\uf900-\ufaff]")
+
+_EN_RULE_REMINDER = (
+    "\n\n【硬性规则】\"prompt_en\" 必须是纯英文生图词（English only，60-120 词，"
+    "subject + action + scene + composition + lighting + style + details + quality 结构），"
+    "禁止任何中文。只输出一个 JSON 对象。"
+)
+
+
+def _has_cjk(s):
+    return bool(_CJK_RE.search(s or ""))
+
+
+def _en_violation(d):
+    """返回 prompt_en 违反英文契约的原因；None 表示合规。"""
+    en = (d.get("prompt_en") or "").strip()
+    if not en:
+        return "prompt_en 缺失"
+    if _has_cjk(en):
+        return "prompt_en 含中文"
+    return None
+
+
+def _plan_en_violation(d):
+    """微调计划的动作感知校验：regenerate 重掷允许不带新提示词。"""
+    action = (d.get("action") or "").strip().lower()
+    if action in ("", "done"):
+        return None
+    if action == "regenerate" and not (d.get("prompt_en") or "").strip():
+        return None          # 合法重掷：沿用当前提示词换种子
+    return _en_violation(d)
+
+
+def _retry_english(model, system, user, first_text, first_d, what, check=None):
+    """prompt_en 缺失/含中文时，带纠错指令重试一次；仍失败则抛错。"""
+    check = check or _en_violation
+    reason = check(first_d)
+    fix_system = system + _EN_RULE_REMINDER
+    fix_user = (user + f"\n\n【你上次的输出】\n{first_text[:2000]}"
+                f"\n【纠错】{reason}。请重新输出完整 JSON，\"prompt_en\" 用纯英文。")
+    text2, used2 = llm_call(model, fix_system, fix_user)
+    d2 = _parse_json(text2)
+    if check(d2):
+        raise ValueError(
+            f"{what}未返回英文 prompt_en（纠错重试仍失败：{check(d2)}）。"
+            f"原始输出片段：{text2[:200]}")
+    return text2, d2, used2
+
+
+def _guarded_parse(kind, model, system, user, check=None):
+    """解析一次输出；若开启英文契约且校验违规，带纠错指令重试一次。"""
+    check = check or _en_violation
+    text, used = llm_call(model or pick_refiner(), system, user)
+    d = _parse_json(text)
+    if CFG.get("enforce_english_prompt", True) and check(d):
+        text, d, used = _retry_english(model, system, user, text, d, kind, check)
+    return text, d, used
+
+
 def gen_questions(wish, model=None, count=None):
     system, user = zprompts.questions(wish, count)
     text, used = llm_call(model or pick_refiner(), system, user)
@@ -239,15 +304,15 @@ def gen_questions(wish, model=None, count=None):
 
 def gen_prompt(wish, answers, model=None):
     system, user = zprompts.prompt(wish, answers)
-    text, used = llm_call(model or pick_refiner(), system, user)
-    d = _normalize_prompt(_parse_json(text), wish)
+    text, d, used = _guarded_parse("精修", model, system, user)
+    _normalize_prompt(d, wish)
     return used, d
 
 
 def rewrite_prompt(qa_ctx, current_cn, feedback, model=None, w=None, h=None, current_en=""):
     system, user = zprompts.rewrite(qa_ctx, current_cn, current_en, feedback, w or 1024, h or 1024)
-    text, used = llm_call(model or pick_refiner(), system, user)
-    d = _normalize_prompt(_parse_json(text), current_cn)
+    text, d, used = _guarded_parse("重写", model, system, user)
+    _normalize_prompt(d, current_cn)
     if w: d["w"] = int(d.get("w", w))
     if h: d["h"] = int(d.get("h", h))
     return used, d
@@ -280,9 +345,14 @@ def gen_plan(wish, current_cn, history, feedback, model=None, image_path=None,
         except Exception:
             image_desc = None
     system, user = zprompts.plan(wish, current_cn, current_en, history, feedback, image_desc)
-    text, used = llm_call(model or pick_refiner(), system, user)
-    d = _parse_json(text)
-    if d.get("prompt_cn") or d.get("prompt_en") or d.get("prompt"):
+    text, d, used = _guarded_parse("微调规划", model, system, user, check=_plan_en_violation)
+    action = (d.get("action") or "").strip().lower()
+    en = (d.get("prompt_en") or "").strip()
+    if action == "regenerate" and not en:
+        # 重掷：前端会自动沿用当前英文提示词换种子重试。
+        # 绝不把中文 prompt_cn 兜底成 prompt_en（那会拿中文直接重画）。
+        d["prompt_en"] = ""
+    elif d.get("prompt_cn") or en or d.get("prompt"):
         _normalize_prompt(d, current_cn)
     d["image_desc"] = image_desc or None
     return used, d
