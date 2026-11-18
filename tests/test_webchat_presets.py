@@ -92,6 +92,23 @@ check("卡片有一键补全按钮", "smartFill(${i})" in html)
 check("预设加载被 UI 调用", "await loadWebPresets()" in html)
 check("S 含 webPresets 状态", "webPresets:[]" in html)
 check("下拉候选走 esc", 'esc(p.url)' in html and 'esc(p.name)' in html)
+
+# 前端内嵌预设（关键：单文件更新 / 后端接口缺失时仍可用，修复实测"找不到 gemini"）
+check("前端内嵌 BUILTIN_PRESETS 常量", "const BUILTIN_PRESETS = [" in html)
+check("loadWebPresets 以内嵌为准", "BUILTIN_PRESETS.slice()" in html
+      and "typeof BUILTIN_PRESETS" in html)
+check("后端接口失败静默回退", "/api/webchat_presets" in html
+      and "静默回退到内嵌预设" in html)
+# 内嵌预设 JSON 与后端数量一致、含用户点名站点
+m = re.search(r"const BUILTIN_PRESETS = (\[.*?\]);", html, re.S)
+check("内嵌预设可被解析", bool(m))
+if m:
+    embedded = json.loads(m.group(1))
+    check("内嵌预设与后端数量一致", len(embedded) == len(ps),
+          f"{len(embedded)} vs {len(ps)}")
+    emb_ids = {p["id"] for p in embedded}
+    check("内嵌含 gemini/chatgpt", {"gemini", "chatgpt"} <= emb_ids)
+    check("内嵌与后端 id 集合一致", emb_ids == set(ids))
 # JS 语法
 m = re.search(r"<script>(.*?)</script>", html, re.S)
 js = m.group(1) if m else ""
