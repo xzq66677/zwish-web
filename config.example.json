@@ -35,6 +35,13 @@
   "_英文提示词契约说明": "prompt_en 是真正送进 ComfyUI 的生图词。true（默认）时若通道返回的 prompt_en 缺失或含中文（实测元宝会出现），会带纠错指令重试一次，仍失败则报错，绝不静默拿中文/旧词直接生图。部分本地模型只会输出中文时，可设为 false 恢复中文直通。",
   "enforce_english_prompt": true,
 
+  "_对话后自动清理说明": "每次网页通道（DS·网页 / 元宝 / 自定义）对话结束后执行。delete_chat=尽力删除 AI 网站上的本次聊天记录（点站点的删除/新建对话按钮，是否彻底从账号移除由网站决定）；close_tab=关闭本次打开的网页标签；close_login=关闭残留的登录窗口（登录态仍保存在 profile，下次自动复用）。也可用 ⚙️ 设置 → 🌐 网页通道 里的开关改，保存到 web_cleanup.json。",
+  "web_cleanup": {
+    "delete_chat": true,
+    "close_tab": true,
+    "close_login": true
+  },
+
   "_DS网页说明": "「DS · 网页」通道用 CDP（Chrome DevTools Protocol）直接控制本机浏览器访问 deepseek.com，零额外依赖，无需安装 playwright。headless=false 首次会打开浏览器让你登录，登录态存 data/ds_profile。网页改版导致找不到输入框/回复时，调整下面的选择器。",
   "_ds_web_browser说明": "用哪个浏览器。auto=优先本机 Chrome/Edge/Chromium（推荐，零下载）；也可填 chrome / msedge / chromium / 自定义 exe 绝对路径。本机需已装任意一款浏览器。",
   "ds_web_browser": "auto",

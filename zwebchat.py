@@ -432,10 +432,14 @@ atexit.register(shutdown_browsers)
 
 
 def open_login_window(cid):
-    """打开通道页面供用户登录（不发送任何内容）。"""
+    """打开通道页面供用户登录（不发送任何内容）。
+
+    登录窗口登记到 zds 的残留表：对话结束后由 zds.close_login_tabs 统一关闭。
+    """
     ch = _channel(cid)
     browser = get_browser(ch)
     ws, target_id = browser.new_tab(ch["url"])
+    zds.register_login_tab(browser, target_id)
     return browser, ws, target_id
 
 
@@ -501,6 +505,7 @@ def _web_chat_locked(cid, system, user, timeout):
 
     browser = get_browser(ch)
     ws = target_id = None
+    msg_sent = False
     try:
         ws, target_id = browser.new_tab(url)
         time.sleep(2)
@@ -612,6 +617,7 @@ def _web_chat_locked(cid, system, user, timeout):
             raise RuntimeError(
                 f"{ch['name']} 发送未触发（{send_state}）。请确认输入框已填入文本，"
                 "并更新 custom_web_channels 中该通道的 selectors.send。")
+        msg_sent = True
 
         # 回复探测：最后候选节点 3 次稳定 + 无生成中标志。
         probe = f"""(function(){{
@@ -656,15 +662,26 @@ def _web_chat_locked(cid, system, user, timeout):
                 "selectors.answer 后重试。")
         return last_text
     finally:
+        if msg_sent:
+            try:
+                # 通道级 selectors.delete_chat 可覆盖通用删除按钮选择器
+                zds.delete_chat_record(ws, (ch.get("selectors") or {}).get("delete_chat"))
+            except Exception:
+                pass
+        try:
+            zds.close_login_tabs(browser)
+        except Exception:
+            pass
         try:
             if ws:
                 ws.close()
         except Exception:
             pass
-        try:
-            browser.close_tab(target_id)
-        except Exception:
-            pass
+        if zds._cleanup_cfg().get("close_tab", True):
+            try:
+                browser.close_tab(target_id)
+            except Exception:
+                pass
 
 
 def _read_probe(raw):

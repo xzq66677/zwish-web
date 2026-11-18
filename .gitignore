@@ -4,6 +4,7 @@ config.json
 providers.json
 cloud.json
 prompts.json
+web_cleanup.json        # 对话后自动清理开关
 
 # ── 本机生成数据 ─────────────────────────────────────────
 data/
