@@ -320,11 +320,47 @@ def _profile_dir(ch):
     if ch.get("profile"):
         p = ch["profile"]
         return p if os.path.isabs(p) else os.path.join(zconfig.HERE, p)
+    # 内收的 DS / 元宝 复用其原有已登录 profile，避免用户重新登录
+    if ch["id"] == "deepseek":
+        return zds.PROFILE
+    if ch["id"] == "yuanbao":
+        import zyuanbao
+        return zyuanbao.PROFILE
     return os.path.join(zconfig.HERE, "data", f"webchat_{ch['id']}_profile")
+
+
+# ── 内收委托：DS / 元宝 已从顶部独立入口收进「🌐 AI 网页」 ────────
+# 它们各有真机调优过的引擎（发送控件兼容、helper 导航、并发串行、对话清理）
+# 与已登录 profile，统一交给原引擎执行，不重复实现、不丢登录态。
+_BUILTIN_HOSTS = {"deepseek": "deepseek.com", "yuanbao": "yuanbao.tencent.com"}
+
+
+def _delegate(cid):
+    """返回内置同名通道对应的模块（zds / zyuanbao），否则 None。
+
+    仅当通道 URL 确实指向对应官方站点时才委托，避免用户自建的同名通道
+    被错误地劫持到内置引擎。
+    """
+    host = _BUILTIN_HOSTS.get(cid)
+    if not host:
+        return None
+    try:
+        url = _channel(cid)["url"]
+    except ValueError:
+        url = ""
+    if url and host not in url:
+        return None
+    if cid == "deepseek":
+        return zds
+    import zyuanbao
+    return zyuanbao
 
 
 def available(cid):
     """检测通道是否可用，返回 (bool, 说明)。"""
+    mod = _delegate(cid)          # DS / 元宝：用各自引擎的原生可用性检测
+    if mod is not None:
+        return mod.available()
     try:
         ch = _channel(cid)
     except ValueError as e:
@@ -436,6 +472,15 @@ def open_login_window(cid):
 
     登录窗口登记到 zds 的残留表：对话结束后由 zds.close_login_tabs 统一关闭。
     """
+    mod = _delegate(cid)                     # 内收：DS / 元宝 用各自原引擎与 profile
+    if mod is not None:
+        if hasattr(mod, "open_login_window"):    # 元宝引擎自带登录窗口
+            return mod.open_login_window()
+        browser = mod.get_browser()              # zds 无登录窗口，用其常驻浏览器开标签
+        url = mod.CFG.get("ds_web_chat_url") or "https://chat.deepseek.com/"
+        ws, target_id = browser.new_tab(url)
+        zds.register_login_tab(browser, target_id)
+        return browser, ws, target_id
     ch = _channel(cid)
     browser = get_browser(ch)
     ws, target_id = browser.new_tab(ch["url"])
@@ -445,6 +490,38 @@ def open_login_window(cid):
 
 def login_state(cid):
     """探测通道页面登录态摘要，供本机 /api/webchat_status 排障使用。"""
+    mod = _delegate(cid)                     # 内收：DS / 元宝 在各自原引擎上探测
+    if mod is not None:
+        if hasattr(mod, "login_state"):          # 元宝引擎自带登录态探测
+            return mod.login_state()
+        ch = _channel(cid)                       # zds 无 login_state，就地探测
+        browser = mod.get_browser()
+        url = mod.CFG.get("ds_web_chat_url") or "https://chat.deepseek.com/"
+        ws, target_id = browser.new_tab(url)
+        try:
+            time.sleep(3)
+            composers = json.dumps(_sel(ch, "composer"), ensure_ascii=False)
+            expr = ("(function(){"
+                    "var t=((document.body&&document.body.innerText)||'');"
+                    "var tl=t.toLowerCase();"
+                    "return JSON.stringify({"
+                    f"hasComposer: !!window.__zfind({composers}),"
+                    "hasLoginPanel: t.indexOf('登录')>=0 || t.indexOf('扫码')>=0 ||"
+                    " t.indexOf('二维码')>=0 || tl.indexOf('log in')>=0 ||"
+                    " tl.indexOf('sign in')>=0,"
+                    "url: location.href,"
+                    "title: document.title});})()")
+            raw = zds._eval(ws, expr)
+            return json.loads(raw) if raw else {"error": "login state probe failed"}
+        finally:
+            try:
+                ws.close()
+            except Exception:
+                pass
+            try:
+                browser.close_tab(target_id)
+            except Exception:
+                pass
     ch = _channel(cid)
     browser = get_browser(ch)
     ws, target_id = browser.new_tab(ch["url"])
@@ -484,8 +561,13 @@ def channel_name(cid):
 def web_chat(cid, system, user, timeout=150):
     """在自定义 AI 网页发起一次对话，返回助手回复文本。
 
-    全程持 zds._WEB_LOCK：所有网页自动化（DS / 元宝 / 自定义）串行执行。
+    DS / 元宝 已内收进「🌐 AI 网页」，委托给各自原引擎执行（其内部自行持
+    zds._WEB_LOCK，故必须在取锁之前转发，避免不可重入锁死锁）。
+    其余通道全程持 zds._WEB_LOCK：所有网页自动化串行执行。
     """
+    mod = _delegate(cid)
+    if mod is not None:
+        return mod.web_chat(system, user, timeout)
     with zds._WEB_LOCK:
         return _web_chat_locked(cid, system, user, timeout)
 
