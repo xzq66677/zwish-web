@@ -57,6 +57,138 @@ _DEFAULT_SELECTORS = {
 
 _ID_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,31}$")
 
+# ── 智能配置预设库（issue #28）──────────────────────────────────────
+# 用户只需输入网站名 / 别名 / 拼音，即可一键填充网址与选择器，无需手查 CSS。
+# aliases 用小写，匹配时不区分大小写、中英文与常见简称都支持。
+# 选择器为通用兜底（覆盖多数 React/Vue 聊天 UI），站点改版后可按 DOM 诊断微调，
+# 与企业级内置通道（DS/元宝）一样遵循"文字外发、图片本地、不绕限额"。
+def _preset(cid, name, url, aliases, lang="zh", composer=None, send=None,
+            answer=None, generating=None):
+    """构造一份预设；未显式给出的选择器按中/英文站点取通用兜底。"""
+    if lang == "zh":
+        d_send = ['button[aria-label*="发送"]', 'button:has-text("发送")',
+                  'div[role="button"]:has-text("发送")', '[role="button"][aria-label*="发送"]',
+                  'button[type="submit"]']
+        d_answer = ['[class*="markdown"]', '[class*="answer"]', '[class*="message"] pre']
+        d_gen = ['[class*="stop"]', 'button[aria-label*="停止"]']
+    else:
+        d_send = ['button[aria-label*="Send"]', 'button[data-testid*="send"]',
+                  'button[type="submit"]', 'button:has-text("Send")',
+                  '[role="button"]:has-text("Send")']
+        d_answer = ['[class*="markdown"]', '[class*="response"]',
+                    '[class*="message"] pre', '[data-testid*="message"]']
+        d_gen = ['button[aria-label*="Stop"]', '[class*="stop"]']
+    d_composer = ['textarea', '[contenteditable="true"]', 'textarea[placeholder]']
+    return {
+        "id": cid, "name": name, "url": url, "aliases": aliases,
+        "browser": "auto", "headless": False,
+        "selectors": {
+            "composer": composer or d_composer,
+            "send": send or d_send,
+            "answer": answer or d_answer,
+            "generating": generating or d_gen,
+        },
+    }
+
+
+# 国内主流
+PRESETS = [
+    _preset("qianwen", "通义千问", "https://tongyi.aliyun.com/qianwen/",
+            ["千问", "通义千问", "通义", "qwen", "tongyi", "aliyun"],
+            composer=["textarea", '[contenteditable="true"]', "textarea#chat-input"],
+            answer=['[class*="markdown"]', '[class*="answer-item"]', '[class*="tongyi-markdown"]']),
+    _preset("deepseek", "DeepSeek", "https://chat.deepseek.com/",
+            ["deepseek", "深度求索", "ds"], lang="en",
+            answer=['.ds-markdown', '[class*="assistant"] [class*="markdown"]', '[class*="message"] pre']),
+    _preset("yuanbao", "腾讯元宝", "https://yuanbao.tencent.com/chat/",
+            ["元宝", "腾讯元宝", "yuanbao", "tencent"],
+            answer=['[class*="markdown"]', '[class*="answer"]']),
+    _preset("doubao", "豆包", "https://www.doubao.com/chat/",
+            ["豆包", "doubao", "字节"],
+            composer=["textarea", '[contenteditable="true"]', 'textarea[data-testid*="input"]']),
+    _preset("yiyan", "文心一言", "https://yiyan.baidu.com/",
+            ["文心一言", "文心", "yiyan", "百度", "baidu"],
+            answer=['[class*="markdown"]', '[class*="answer"]', '[class*="result"]']),
+    _preset("glm", "智谱清言", "https://chatglm.cn/",
+            ["智谱", "清言", "chatglm", "glm", "智谱清言"]),
+    _preset("spark", "讯飞星火", "https://xinghuo.xfyun.cn/",
+            ["星火", "讯飞", "spark", "xfyun", "讯飞星火"]),
+    _preset("kimi", "Kimi", "https://kimi.moonshot.cn/",
+            ["kimi", "月之暗面", "moonshot"], lang="en",
+            composer=["textarea", '[contenteditable="true"]']),
+    _preset("metaso", "秘塔 AI", "https://metaso.cn/",
+            ["秘塔", "metaso", "秘塔ai"]),
+    _preset("minimax", "MiniMax 海螺", "https://chat.minimaxi.com/",
+            ["minimax", "海螺", "abab"], lang="en"),
+    _preset("step", "阶跃星辰", "https://www.stepfun.com/",
+            ["阶跃", "step", "stepfun", "阶跃星辰"], lang="en"),
+    _preset("baichuan", "百川智能", "https://www.baichuan-ai.com/",
+            ["百川", "baichuan"]),
+    _preset("tiangong", "天工 AI", "https://www.tiangong.cn/",
+            ["天工", "tiangong", "昆仑万维"]),
+    _preset("sensetime", "商量", "https://chat.sensetime.com/",
+            ["商量", "商汤", "sensetime"]),
+    _preset("zhihu", "知乎直答", "https://zhida.zhihu.com/",
+            ["知乎", "知乎直答", "zhihu"]),
+    _preset("pangu", "华为盘古", "https://pangu.huaweicloud.com/",
+            ["盘古", "华为", "pangu", "华为盘古"]),
+    # 海外主流
+    _preset("chatgpt", "ChatGPT", "https://chatgpt.com/",
+            ["gpt", "chatgpt", "openai", "gpt4", "gpt-4", "chatgpt"],
+            lang="en", composer=['#prompt-textarea', 'textarea', '[contenteditable="true"]'],
+            send=['button[data-testid="send-button"]', 'button[aria-label*="Send"]']),
+    _preset("gemini", "Gemini", "https://gemini.google.com/",
+            ["gemini", "谷歌", "google", "bard", "双子星"], lang="en",
+            composer=['textarea[aria-label*="Prompt"]', 'textarea', '[contenteditable="true"]'],
+            send=['button[aria-label*="Send"]', 'button[data-testid*="send"]']),
+    _preset("claude", "Claude", "https://claude.ai/",
+            ["claude", "anthropic"], lang="en",
+            composer=['[contenteditable="true"]', 'textarea'],
+            send=['button[aria-label*="Send"]']),
+    _preset("grok", "Grok", "https://grok.com/",
+            ["grok", "马斯克", "xai"], lang="en",
+            send=['button[aria-label*="Submit"]', 'button[type="submit"]', 'button:has-text("Send")']),
+    _preset("copilot", "Microsoft Copilot", "https://copilot.microsoft.com/",
+            ["copilot", "bing", "微软", "必应", "new bing"], lang="en",
+            send=['button[aria-label*="Send"]', '[class*="submit"]']),
+    _preset("perplexity", "Perplexity", "https://www.perplexity.ai/",
+            ["perplexity", "pplx"], lang="en",
+            composer=['textarea', '[contenteditable="true"]']),
+    _preset("mistral", "Mistral Le Chat", "https://chat.mistral.ai/",
+            ["mistral", "le chat", "mixtral"], lang="en"),
+    _preset("huggingchat", "HuggingChat", "https://huggingface.co/chat/",
+            ["huggingchat", "huggingface", "hf"], lang="en"),
+    _preset("poe", "Poe", "https://poe.com/",
+            ["poe", "quora"], lang="en"),
+]
+
+
+def match_presets(query, limit=8):
+    """按名称/别名/id 模糊匹配预设，返回按相关度排序的预设列表。
+
+    匹配规则：完全相等 > 前缀 > 子串；中文名、英文名、别名、拼音都覆盖。
+    query 为空时返回全部预设（前端首次加载展示候选池）。
+    """
+    q = (query or "").strip().lower()
+    if not q:
+        return list(PRESETS)
+    scored = []
+    for p in PRESETS:
+        fields = [p["id"], p["name"]] + list(p.get("aliases") or [])
+        best = 0
+        for f in fields:
+            f = str(f).lower()
+            if f == q:
+                best = max(best, 100)
+            elif f.startswith(q):
+                best = max(best, 70)
+            elif q in f:
+                best = max(best, 40)
+        if best:
+            scored.append((best, p["name"], p))
+    scored.sort(key=lambda x: (-x[0], x[1]))
+    return [p for _, _, p in scored[:limit]]
+
 # ── 自定义通道持久化（issue: 前端网页自配置）─────────────────────
 # 用户在网页「⚙️ 设置 → 🌐 网页通道」里增删改的通道列表存这里（已 gitignore），
 # 与 prompts.json / providers.json 同属"用户覆盖"文件，避免直接改写 config.json。

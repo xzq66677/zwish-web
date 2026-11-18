@@ -290,6 +290,13 @@
         <b>每个通道独立登录态，需首次在弹出窗口登录一次</b>；文字会发到该网站，<b>图片与看图点评仍走本地</b>。
         不自动登录、不绕过平台限额。选择器可按报错里的 DOM 诊断调整。
       </div>
+      <div style="padding:10px 20px; border-bottom:1px solid var(--line); display:flex; gap:8px; align-items:center; flex-wrap:wrap">
+        <span style="font-size:12px; color:var(--dim); white-space:nowrap">✨ 智能添加</span>
+        <input id="wSmart" list="wSmartList" oninput="smartSuggest()" onkeydown="if(event.key==='Enter')smartAdd()"
+               placeholder="输入网站名/别名，如 千问、Gemini、gpt、豆包…" style="flex:1; min-width:200px">
+        <datalist id="wSmartList"></datalist>
+        <span class="mini" style="width:auto" onclick="smartAdd()">➕ 一键填充</span>
+      </div>
       <div class="sbody" id="wbody"><div class="hempty">加载中…</div></div>
       <div style="padding:14px 20px; border-top:1px solid var(--line); display:flex; gap:10px; flex-wrap:wrap">
         <button class="btn" onclick="addWebChannel()">➕ 新网页通道</button>
@@ -318,7 +325,7 @@
 const S = { model:"auto", stage:"wish", wish:"", qa:"", answers:[], questions:[], sel:[],
             prompt:null, promptCn:null, w:1024, h:1024, lastImg:null, attach:null, hist:[], seed:null,
             params:{ w:1024, h:1024, den:0.55, denLock:false, steps:8, grow:12, threshold:0.5, seed:null, batch:1 },
-            provs:[], cloudSel:null, dsWebOk:false, dsWebMsg:"", ybOk:false, ybMsg:"", webChannels:[], webEdit:[], webSource:"config", visionModel:"gemma3:4b", comfyPort:8188,
+            provs:[], cloudSel:null, dsWebOk:false, dsWebMsg:"", ybOk:false, ybMsg:"", webChannels:[], webEdit:[], webSource:"config", webPresets:[], visionModel:"gemma3:4b", comfyPort:8188,
             askCfg:null, askCount:2, askMode:"follow" };
 const $ = id => document.getElementById(id);
 const chat = $("chat"), inp = $("inp");
@@ -1091,8 +1098,75 @@ function renderWebChips(){
     else document.querySelector("header").appendChild(el);
   });
 }
+// ── 智能配置：输入网站名/别名，模糊匹配预设库一键填充（issue #28）──
+function presetMatch(q){
+  const query = (q||"").trim().toLowerCase();
+  const ps = S.webPresets||[];
+  if (!query) return ps.slice(0,12);
+  const scored = [];
+  ps.forEach(p=>{
+    const fields = [p.id, p.name].concat(p.aliases||[]);
+    let best = 0;
+    fields.forEach(f=>{
+      f = String(f).toLowerCase();
+      if (f === query) best = Math.max(best, 100);
+      else if (f.startsWith(query)) best = Math.max(best, 70);
+      else if (f.indexOf(query) >= 0) best = Math.max(best, 40);
+    });
+    if (best) scored.push([best, p.name, p]);
+  });
+  scored.sort((a,b)=> (b[0]-a[0]) || a[1].localeCompare(b[1]));
+  return scored.slice(0,8).map(x=>x[2]);
+}
+async function loadWebPresets(){
+  try{
+    const r = await api("/api/webchat_presets");
+    S.webPresets = r.presets||[];
+  }catch(e){ S.webPresets=[]; }
+}
+function smartSuggest(){
+  const inp = $("wSmart"), dl = $("wSmartList");
+  if (!inp || !dl) return;
+  const hits = presetMatch(inp.value);
+  dl.innerHTML = hits.map(p=>`<option value="${esc(p.name)}">${esc(p.url)}</option>`).join("");
+}
+function presetToChannel(p){
+  return {...webBlank(), id:p.id, name:p.name, url:p.url,
+          browser:p.browser||"auto", headless:!!p.headless, enabled:true,
+          selectors:{...webBlank().selectors, ...(p.selectors||{})}};
+}
+function smartAdd(){
+  collectAllWeb();
+  const inp = $("wSmart");
+  if (!inp || !inp.value.trim()){ addErr("请输入网站名，如 千问 / Gemini / gpt"); return; }
+  const hits = presetMatch(inp.value);
+  if (!hits.length){ addErr("没找到「"+inp.value+"」的预设，可点「➕ 新网页通道」手动填写"); return; }
+  const p = hits[0];
+  // 已存在同 id 则提示并定位，不重复添加
+  const exist = (S.webEdit||[]).findIndex(c=>c.id===p.id);
+  if (exist >= 0){ addWizard("「"+p.name+"」已在列表中（第 "+(exist+1)+" 项），已为你定位"); return; }
+  S.webEdit.push(presetToChannel(p));
+  inp.value = ""; smartSuggest();
+  renderWebChannels();
+  addWizard("已智能填充「"+p.name+"」→ "+p.url+"（记得点保存）");
+}
+function smartFill(i){
+  collectAllWeb();
+  const c = S.webEdit[i];
+  if (!c) return;
+  const hits = presetMatch(c.name || c.id || c.url || "");
+  if (!hits.length){ addErr("无法根据当前名称/ID 匹配预设，请在上方「智能添加」里选网站"); return; }
+  const p = hits[0];
+  const filled = [];
+  if (!c.url || c.url !== p.url){ c.url = p.url; filled.push("网址"); }
+  c.selectors = {...webBlank().selectors, ...(p.selectors||{})}; filled.push("选择器");
+  if (!c.name){ c.name = p.name; filled.push("名称"); }
+  renderWebChannels();
+  addWizard("已按「"+p.name+"」补全："+filled.join("、")+"（记得点保存）");
+}
 async function loadWebChannelsUI(){
   const box = $("wbody");
+  await loadWebPresets();
   try{
     const r = await api("/api/webchat_channels");
     S.webEdit = (r.channels||[]).map(c=>({...webBlank(), ...c,
@@ -1126,6 +1200,7 @@ function renderWebChannels(){
       <div class="prow"><label>浏览器</label>
         <input data-wf="browser" data-i="${i}" value="${esc(c.browser||"auto")}" placeholder="auto">
         <label class="sw"><input type="checkbox" data-wf="headless" data-i="${i}" ${c.headless?"checked":""}> 无头</label>
+        <span class="mini" style="width:auto" onclick="smartFill(${i})" title="根据名称/ID 从预设库补全网址与选择器">✨ 补全</span>
         <span class="mini" style="width:auto" onclick="webLogin(${i})">🔑 打开登录</span>
         <span class="mini" style="width:auto" onclick="webStatus(${i})">🔍 检测状态</span></div>
       <div class="prow"><label>选择器</label><span class="tres" id="wst${i}"></span></div>

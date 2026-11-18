@@ -301,6 +301,13 @@ class H(BaseHTTPRequestHandler):
             return self._json(zprompts.state())
         if path == "/api/providers":
             return self._json({"providers": _mask_providers(zwish.PROVIDERS or zwish.load_providers())})
+        if path == "/api/webchat_presets":
+            # 智能配置预设库：输入网站名/别名即可自动填充 url 与选择器
+            try:
+                import zwebchat
+                return self._json({"presets": zwebchat.PRESETS})
+            except Exception as e:
+                return self._json({"error": str(e)})
         if path == "/api/webchat_channels":
             # 网页自配置通道列表（含 disabled），供设置面板编辑
             try:
