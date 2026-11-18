@@ -56,5 +56,51 @@
     "send": ["div[aria-label=\"发送\"]", "[aria-label*=\"发送\"]", "button:has-text(\"发送\")"],
     "answer": [".hyc-content-md", "[class*=\"hyc-content\"]", "[class*=\"markdown\"]"],
     "generating": []
-  }
+  },
+
+  "_自定义网页通道说明": "「自定义 AI 网页通道」（issue #23）：把任意 AI 对话网站（千问 / Grok / 文心一言、Kimi 等）配置为润色通道。每通道独立 profile（默认 data/webchat_<id>_profile，可用 profile 字段复用已有登录态目录）；enabled=true 后顶部会出现对应标签，首次使用弹出浏览器登录一次。下面三个示例默认关闭（enabled:false），选择器为通用兜底值——各站改版后请按报错里的 DOM 诊断调整 composer / send / answer。高级用法：profile 可指向其他通道的 profile 目录复用登录态（需确保对应浏览器未在运行）。预置不含豆包；需要时按同格式自行添加。",
+  "custom_web_channels": [
+    {
+      "id": "qianwen",
+      "name": "千问 · 网页",
+      "enabled": false,
+      "url": "https://tongyi.aliyun.com/qianwen/",
+      "browser": "auto",
+      "headless": false,
+      "selectors": {
+        "composer": ["textarea", "[contenteditable=\"true\"]"],
+        "send": ["button[aria-label*=\"发送\"]", "div[role=\"button\"]:has-text(\"发送\")", "button:has-text(\"发送\")"],
+        "answer": ["[class*=\"markdown\"]", "[class*=\"answer-item\"]", "[class*=\"tongyi-markdown\"]"],
+        "generating": ["[class*=\"stop\"]", "button[aria-label*=\"停止\"]"]
+      }
+    },
+    {
+      "id": "grok",
+      "name": "Grok · 网页",
+      "enabled": false,
+      "url": "https://grok.com/",
+      "browser": "auto",
+      "headless": false,
+      "selectors": {
+        "composer": ["textarea", "[contenteditable=\"true\"]"],
+        "send": ["button[aria-label*=\"Submit\"]", "button[type=\"submit\"]", "button:has-text(\"Send\")"],
+        "answer": ["[class*=\"message-bubble\"]", "[class*=\"markdown\"]", "[class*=\"response\"]"],
+        "generating": ["button[aria-label*=\"Stop\"]", "[class*=\"stop\"]"]
+      }
+    },
+    {
+      "id": "yiyan",
+      "name": "文心一言 · 网页",
+      "enabled": false,
+      "url": "https://yiyan.baidu.com/",
+      "browser": "auto",
+      "headless": false,
+      "selectors": {
+        "composer": ["textarea", "[contenteditable=\"true\"]"],
+        "send": ["button[aria-label*=\"发送\"]", "button:has-text(\"发送\")", "div[role=\"button\"]:has-text(\"发送\")"],
+        "answer": ["[class*=\"markdown\"]", "[class*=\"answer\"]", "[class*=\"result\"]"],
+        "generating": ["[class*=\"stop\"]", "button[aria-label*=\"停止\"]"]
+      }
+    }
+  ]
 }

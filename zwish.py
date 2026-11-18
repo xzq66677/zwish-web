@@ -172,6 +172,13 @@ def llm_yuanbao_web(system, user):
     return text, "腾讯元宝/网页"
 
 
+def llm_webchat(cid, system, user):
+    """自定义 AI 网页通道（__web__:<id>，配置驱动，见 issue #23）。"""
+    import zwebchat
+    text = zwebchat.web_chat(cid, system, user)
+    return text, f"{zwebchat.channel_name(cid)}"
+
+
 def llm_call(model, system, user):
     """统一入口：返回 (文本, 实际模型名)。
 
@@ -179,6 +186,7 @@ def llm_call(model, system, user):
       __ds_api__  → DeepSeek API
       __ds_web__  → DeepSeek 网页自动化
       __yuanbao_web__ → 腾讯元宝网页自动化（本机实验备用）
+      __web__:<id> → 自定义 AI 网页通道（config.custom_web_channels）
       __local_fine__ → 本地精细润色模型
       __cloud__[:sel]  → 通用云端
       其他/None → 本地自由模式模型
@@ -189,6 +197,8 @@ def llm_call(model, system, user):
         return llm_ds_web(system, user)
     if model == "__yuanbao_web__":
         return llm_yuanbao_web(system, user)
+    if isinstance(model, str) and model.startswith("__web__:"):
+        return llm_webchat(model.split(":", 1)[1], system, user)
     if model == "__local_fine__":
         m = FINE_MODEL
         return llm_json(m, system, user), m

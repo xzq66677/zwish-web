@@ -36,6 +36,7 @@
   | DS · 网页  | CDP 控制本机浏览器访问 `chat.deepseek.com`，**零额外依赖 + 内置提示词** | 是（需登录一次）     |
   | 元宝 · 网页 | CDP 控制本机浏览器访问 `yuanbao.tencent.com`，**独立 profile + 内置提示词**（备用通道） | 是（需登录一次）     |
   | ☁️ 云端    | 设置面板里任意 OpenAI/Anthropic 兼容供应商                      | 是            |
+  | 自定义网页 | config.json 声明任意 AI 对话网站（千问 / Grok / 文心一言…），独立 profile + 可配置选择器 | 是（需登录一次） |
 - **生图三模式**：文生图 / img2img 整图改 / SAM 3 自动蒙版局部重绘
 - **看图点评**：本地视觉模型看着图给建议，一键应用
 - **历史记录**：提示词 / 参数 / 种子 / 耗时落盘，可载入继续改、复制、删除
@@ -158,6 +159,35 @@ DeepSeek 网页额度用尽时，可手动切换到腾讯元宝网页通道（Is
 
 > 与 DS·网页共用 `zds._WEB_LOCK`，两条网页通道串行执行，不会同时操作同一个浏览器。使用前请自行确认腾讯元宝的数据政策与使用条款。
 
+### 自定义 AI 网页通道（配置驱动，无需改代码）
+
+DS / 元宝之外，可在 `config.json` 的 `custom_web_channels` 里声明任意 AI 对话网站（千问、Grok、文心一言、Kimi 等）作为润色通道。`config.example.json` 附带千问 / Grok / 文心一言三个示例，**默认关闭**且预置不含豆包——需要豆包时按同格式自行添加。
+
+```json
+"custom_web_channels": [
+  {
+    "id": "qianwen",
+    "name": "千问 · 网页",
+    "enabled": true,
+    "url": "https://tongyi.aliyun.com/qianwen/",
+    "browser": "auto",
+    "headless": false,
+    "selectors": {
+      "composer": ["textarea", "[contenteditable=\"true\"]"],
+      "send": ["button[aria-label*=\"发送\"]", "div[role=\"button\"]:has-text(\"发送\")"],
+      "answer": ["[class*=\"markdown\"]", "[class*=\"answer-item\"]"],
+      "generating": ["[class*=\"stop\"]"]
+    }
+  }
+]
+```
+
+- `enabled: true` 后顶部自动出现对应标签；首次使用弹出浏览器，请在**程序弹出的窗口**里登录一次（登录态存 `data/webchat_<id>_profile`，之后自动复用）。
+- `profile` 字段（可选）可指向已有 profile 目录复用登录态——需确保对应官方通道的浏览器未在运行。
+- 选择器为通用兜底值，各站改版后请按报错里的 **DOM 诊断**（候选节点数 / 页面文本长度）调整；也可用 `POST /api/webchat_status {"id":...}` 探测登录态与页面结构。
+- 相关接口：`POST /api/webchat_login {"id":...}` 打开登录窗口；`GET /api/config` 返回各通道 `ok` 状态。
+- 所有自定义通道与 DS / 元宝共用会话锁，串行执行；英文提示词契约（`enforce_english_prompt`）同样生效。
+
 ### 自定义内置提示词（DS 网页 / API / 云端共用）
 
 点右上角 **⚙️ 设置 → 📝 内置提示词**，可直接编辑注入到 **DS · 网页 / DS · API / ☁️ 云端** 通道的每一段 system 模板（追问、精修、重写、改图追问、微调规划、看图描述、看图点评，以及 DS 网页的包裹语）。改完点「保存提示词」立即生效；某段留空或点「恢复此条 / 全部恢复默认」即回退到出厂文本。
@@ -209,6 +239,14 @@ DeepSeek 网页额度用尽时，可手动切换到腾讯元宝网页通道（Is
 ---
 
 ## 变更记录
+
+### 2026-11-18 · 自定义 AI 网页通道（custom_web_channels）
+
+**#23 — 配置驱动的通用网页自动化**：DS / 元宝之外，可在 `config.json` 的 `custom_web_channels` 声明任意 AI 对话网站（千问、Grok、文心一言、Kimi…）作为润色通道。`config.example.json` 附带三个示例（**默认关闭**，预置不含豆包）。每通道独立 profile 与登录态（默认 `data/webchat_<id>_profile`，可用 `profile` 字段复用）；填充自适应 textarea / contenteditable，发送支持 aria-disabled 等待与 Enter 兜底；报错带 DOM 诊断（候选节点数 / 页面文本长度），网页改版只需调选择器。新增接口：`/api/config` 的 `custom_channels` 状态、`POST /api/webchat_login`、`POST /api/webchat_status`。所有自定义通道与 DS / 元宝共用会话锁串行执行，并注入通道契约（禁承诺生图、`prompt_en` English only），英文契约由 `zwish._guarded_parse` 统一兜底。
+
+**真机引擎验证**：以一条临时自定义通道（指向已登录元宝 profile + 已验证选择器）端到端跑通真实对话，返回正常。回归 `tests/test_webchat_channels.py`（29 项），全仓 191/191 通过。
+
+---
 
 ### 2026-11-18 · 英文提示词契约（enforce_english_prompt）
 

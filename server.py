@@ -248,12 +248,18 @@ class H(BaseHTTPRequestHandler):
                 yb_web_ok, yb_web_msg = zyuanbao.available()
             except Exception as e:
                 yb_web_ok, yb_web_msg = False, str(e)
+            try:
+                import zwebchat
+                custom_channels = zwebchat.list_enabled_status()
+            except Exception as e:
+                custom_channels = []
             return self._json({
                 "cloud": bool(ps), "vision_model": zwish.VISION,
                 "comfy_port": CFG.get("comfy_port", 8188),
                 "providers": _mask_providers(zwish.PROVIDERS or zwish.load_providers()),
                 "ds_web": {"ok": ds_web_ok, "msg": ds_web_msg},
                 "yuanbao_web": {"ok": yb_web_ok, "msg": yb_web_msg},
+                "custom_channels": custom_channels,
                 "ask_count": CFG.get("ask_count", {}),
                 "ready": CFG.get("ready", False),
             })
@@ -347,6 +353,28 @@ class H(BaseHTTPRequestHandler):
                                        "msg": "已打开元宝登录窗口，请在其中用微信/手机/QQ 登录"})
                 except Exception as e:
                     return self._json({"ok": False, "error": str(e)})
+
+            # ── 自定义 AI 网页通道（issue #23）：登录窗口 / 登录态探测 ──
+            if path == "/api/webchat_login":
+                try:
+                    import zwebchat
+                    cid = str(b.get("id") or "")
+                    _, ws, _tid = zwebchat.open_login_window(cid)
+                    try:
+                        ws.close()
+                    except Exception:
+                        pass
+                    return self._json({"ok": True, "msg":
+                        f"已打开 {zwebchat.channel_name(cid)} 登录窗口，"
+                        "请在其中登录一次（登录态自动复用）"})
+                except Exception as e:
+                    return self._json({"ok": False, "error": str(e)})
+            if path == "/api/webchat_status":
+                try:
+                    import zwebchat
+                    return self._json(zwebchat.login_state(str(b.get("id") or "")))
+                except Exception as e:
+                    return self._json({"error": str(e)})
 
             if path == "/api/delete":
                 name = os.path.basename(b.get("name", ""))
